@@ -27,6 +27,8 @@ class GlobalQueue:
         self.lock = threading.Lock()
         self.queue = deque()
         self.queue_urls = set()
+        self.completed_urls = 0
+        self.failed_urls = 0
     
     def add_url(self, url, priority=0):
         """Add URL to global queue"""
@@ -46,16 +48,26 @@ class GlobalQueue:
             self.queue_urls.remove(url)
             print(f"Getting next URL: {url}")
             return url
+    
+    def mark_completed(self):
+        """Mark a URL as completed"""
+        with self.lock:
+            self.completed_urls += 1
+    
+    def mark_failed(self):
+        """Mark a URL as failed"""
+        with self.lock:
+            self.failed_urls += 1
                     
     def get_queue_state(self):
         """Get current queue state"""
         with self.lock:
             return {
-                'total_urls': len(self.queue),
+                'total_urls': len(self.queue) + self.completed_urls + self.failed_urls,
                 'queued_urls': len(self.queue),
                 'processing_urls': 0,
-                'completed_urls': 0,
-                'failed_urls': 0
+                'completed_urls': self.completed_urls,
+                'failed_urls': self.failed_urls
             }
                 
     def clear_queue(self):
@@ -63,6 +75,8 @@ class GlobalQueue:
         with self.lock:
             self.queue = deque()
             self.queue_urls = set()
+            self.completed_urls = 0
+            self.failed_urls = 0
                 
  
 # Global queue instance
@@ -73,6 +87,34 @@ class WebCrawler:
         self.content_db_path = content_db_path
         self.url_manager = URLManager(url_history_db_path)
         self.global_queue = global_queue
+        
+        # Create a session for better cookie handling and authenticity
+        self.session = requests.Session()
+        
+        # Enhanced headers to better mimic a real browser
+        self.session.headers.update({
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
+            'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8,fr;q=0.7',
+            'Accept-Encoding': 'gzip, deflate, br',
+            'DNT': '1',
+            'Connection': 'keep-alive',
+            'Upgrade-Insecure-Requests': '1',
+            'Sec-Fetch-Dest': 'document',
+            'Sec-Fetch-Mode': 'navigate',
+            'Sec-Fetch-Site': 'none',
+            'Sec-Fetch-User': '?1',
+            'Cache-Control': 'max-age=0',
+            'Sec-Ch-Ua': '"Chromium";v="124", "Google Chrome";v="124", "Not-A.Brand";v="99"',
+            'Sec-Ch-Ua-Mobile': '?0',
+            'Sec-Ch-Ua-Platform': '"Windows"',
+            'X-Requested-With': 'XMLHttpRequest',
+        })
+        
+        # Add more realistic browser behavior
+        self.session.verify = True
+        self.session.allow_redirects = True
+        
         self.init_content_db()
         
         # Queue state tracking
@@ -97,10 +139,20 @@ class WebCrawler:
         """Get current queue state"""
         # Get global queue state
         global_state = self.global_queue.get_queue_state()
-        if global_state:
-            self.queue_state.update(global_state)
         
+        # Create a copy of current state
         state = self.queue_state.copy()
+        
+        # Update only the queue-related fields from global state
+        if global_state:
+            state.update({
+                'total_urls': global_state.get('total_urls', 0),
+                'queued_urls': global_state.get('queued_urls', 0),
+                'processing_urls': global_state.get('processing_urls', 0),
+                'completed_urls': global_state.get('completed_urls', 0),
+                'failed_urls': global_state.get('failed_urls', 0)
+            })
+        
         return state
     
     def update_queue_state(self, **kwargs):
@@ -299,6 +351,61 @@ class WebCrawler:
         
         return links, discovered_urls
     
+    def establish_session(self, base_url):
+        """Establish a session with the target website to get cookies and appear more authentic"""
+        try:
+            parsed_url = urlparse(base_url)
+            if parsed_url.netloc:
+                # First visit the main domain to establish session
+                main_domain = f"https://{parsed_url.netloc}"
+                logger.info(f"Establishing session with {main_domain}")
+                
+                # Clear any existing cookies for this domain
+                self.session.cookies.clear()
+                
+                # Add a more realistic referer
+                self.session.headers['Referer'] = 'https://www.google.com/'
+                
+                # First, try to visit the robots.txt to appear more like a real browser
+                try:
+                    robots_url = f"{main_domain}/robots.txt"
+                    self.session.get(robots_url, timeout=5)
+                    time.sleep(0.5)
+                except:
+                    pass  # Ignore robots.txt errors
+                
+                # Visit the main page first with a more realistic approach
+                response = self.session.get(main_domain, timeout=15, allow_redirects=True)
+                
+                if response.status_code == 200:
+                    logger.info(f"Successfully established session with {main_domain}")
+                    
+                    # Try to visit a few more pages to establish a browsing pattern
+                    try:
+                        # Visit common pages to establish session
+                        common_paths = ['/', '/index.html', '/home']
+                        for path in common_paths[:1]:  # Just visit one to avoid being too aggressive
+                            try:
+                                test_url = f"{main_domain}{path}"
+                                if test_url != main_domain:  # Avoid duplicate requests
+                                    self.session.get(test_url, timeout=10)
+                                    time.sleep(1)
+                                    break
+                            except:
+                                pass
+                    except:
+                        pass
+                    
+                    # Small delay after establishing session
+                    time.sleep(2)
+                    return True
+                else:
+                    logger.warning(f"Failed to establish session with {main_domain}: {response.status_code}")
+                    return False
+        except Exception as e:
+            logger.warning(f"Error establishing session: {e}")
+            return False
+    
     def crawl_single_url(self, url, base_url):
         """Crawl a single URL"""
         normalized_url = self.normalize_url(url)
@@ -323,15 +430,42 @@ class WebCrawler:
             
             # Fetch the page with timing
             start_time = time.time()
-            headers = {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-            }
-            response = requests.get(url, timeout=10, headers=headers)
+            
+            # Add referer for better authenticity
+            parsed_url = urlparse(url)
+            if parsed_url.netloc:
+                # Use a more realistic referer pattern
+                if base_url and base_url != url:
+                    self.session.headers['Referer'] = base_url
+                else:
+                    self.session.headers['Referer'] = f'https://{parsed_url.netloc}/'
+            
+            # Add a more realistic delay pattern
+            delay = 1.0 + (time.time() % 2) * 1.5  # 1-2.5 seconds
+            time.sleep(delay)
+            
+            # Add some request headers that change slightly to appear more human
+            self.session.headers['Accept'] = 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7'
+            
+            response = self.session.get(url, timeout=20, allow_redirects=True)
             response_time = time.time() - start_time
+            
+            # Check for common anti-bot responses
+            if response.status_code == 403:
+                logger.warning(f"403 Forbidden - likely blocked by anti-bot protection for {url}")
+                # Try with different headers
+                self.session.headers['User-Agent'] = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36'
+                time.sleep(2)
+                response = self.session.get(url, timeout=20, allow_redirects=True)
+            
             response.raise_for_status()
             
             # Get the raw HTML content
             html_content = response.text
+            
+            # Check if we got a real page or a bot detection page
+            if len(html_content) < 1000 or 'access denied' in html_content.lower() or 'blocked' in html_content.lower():
+                logger.warning(f"Possible bot detection page for {url} - content length: {len(html_content)}")
             
             soup = BeautifulSoup(html_content, 'html.parser')
             
@@ -380,6 +514,9 @@ class WebCrawler:
             self.queue_state['errors'].append(error_msg)
             self.queue_state['failed_urls'] += 1
             
+            # Mark as failed in global queue
+            self.global_queue.mark_failed()
+            
             # Still record the failed attempt in URL history
             self.url_manager.add_url(
                 url=normalized_url,
@@ -398,11 +535,18 @@ class WebCrawler:
                 completed_urls=self.queue_state['completed_urls'] + 1,
                 estimated_completion=self.estimate_completion_time()
             )
+            
+            # Mark as completed in global queue
+            self.global_queue.mark_completed()
     
     def crawl_website(self, base_url):
         """Recursively crawl a website with unlimited depth and pages using global queue"""
         if not base_url.startswith(('http://', 'https://')):
             base_url = 'https://' + base_url
+            
+        # Establish session with the target website
+        self.establish_session(base_url)
+        
         # Add initial URL to global queue
         self.global_queue.add_url(base_url, priority=10)
         logger.info(f"Starting single-threaded crawl of {base_url} using global queue")

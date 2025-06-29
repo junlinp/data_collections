@@ -842,11 +842,21 @@ HTML_TEMPLATE = """
                 console.log('Set crawl tab as active');
             }
             
-            // Pre-load queue state for better performance
+            // Always refresh queue state on page load to show current status
             setTimeout(() => {
-                if (document.getElementById('queue-tab').style.display !== 'none') {
-                    refreshQueueState();
-                }
+                refreshQueueState();
+                // If there's an active crawl, start auto-refresh
+                fetch('/api/queue-state')
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success && data.data && (data.data.total_urls > 0 || data.data.completed_urls > 0)) {
+                            // There's an active crawl, start auto-refresh
+                            if (document.getElementById('auto-refresh').checked) {
+                                startAutoRefresh();
+                            }
+                        }
+                    })
+                    .catch(error => console.error('Error checking queue state on init:', error));
             }, 500);
             
             console.log('Tab initialization completed');
@@ -1071,8 +1081,9 @@ HTML_TEMPLATE = """
         }
         
         function updateQueueDisplay(data) {
-            const queueState = data.queue_state;
-            const crawlingInProgress = data.crawling_in_progress;
+            // The API returns queue state directly under 'data', not 'data.queue_state'
+            const queueState = data;
+            const crawlingInProgress = data.processing_urls > 0;
             
             // Update the queue status display
             const display = document.getElementById('queue-status-display');

@@ -11,13 +11,21 @@ services:
     environment:
       - CRAWLER_PORT=5001
       - DEBUG=False
+      - HTTP_PROXY=http://192.168.31.22:10808
+      - HTTPS_PROXY=http://192.168.31.22:10808
+      - http_proxy=http://192.168.31.22:10808
+      - https_proxy=http://192.168.31.22:10808
+      - NO_PROXY=localhost,127.0.0.1,172.18.0.0/16,10.0.0.0/8,192.168.0.0/16
+      - no_proxy=localhost,127.0.0.1,172.18.0.0/16,10.0.0.0/8,192.168.0.0/16
+      - CONTENT_DB_PATH=/app/data/web_crawler.db
+      - URL_HISTORY_DB_PATH=/app/data/url_history.db
     volumes:
       - /mnt/rbd0/crawler_data:/app/data
     networks:
       - crawler-network
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-v", "http://localhost:5001/api/health"]
+      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:5001/api/health')"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -40,6 +48,12 @@ services:
     networks:
       - crawler-network
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:5002/')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
 
 
 volumes:
