@@ -332,6 +332,28 @@ HTML_TEMPLATE = """
             margin-bottom: 20px;
         }
         
+        .stat-card.model-card {
+            background: linear-gradient(135deg, #28a745, #20c997);
+            position: relative;
+            cursor: help;
+        }
+        
+        .stat-card.model-card:hover::after {
+            content: attr(title);
+            position: absolute;
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0,0,0,0.8);
+            color: white;
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-size: 0.8em;
+            white-space: nowrap;
+            z-index: 1000;
+            margin-bottom: 5px;
+        }
+        
         @media (max-width: 768px) {
             .controls {
                 flex-direction: column;
@@ -379,6 +401,10 @@ HTML_TEMPLATE = """
                 <div class="stat-card">
                     <span class="stat-number" id="processing-status">Idle</span>
                     <span class="stat-label">Status</span>
+                </div>
+                <div class="stat-card model-card" title="LLM Model">
+                    <span class="stat-number" id="llm-model">-</span>
+                    <span class="stat-label">LLM Model</span>
                 </div>
             </div>
             
@@ -441,6 +467,15 @@ HTML_TEMPLATE = """
                         } else {
                             statusElement.textContent = 'Idle';
                             statusElement.style.color = '#28a745';
+                        }
+                        
+                        // Update LLM model information
+                        const modelElement = document.getElementById('llm-model');
+                        if (data.data.local_llm_model) {
+                            modelElement.textContent = data.data.local_llm_model;
+                            modelElement.title = `LLM URL: ${data.data.local_llm_url || 'N/A'}`;
+                        } else {
+                            modelElement.textContent = 'Unknown';
                         }
                     }
                 })
