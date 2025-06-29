@@ -317,38 +317,33 @@ class WebCrawler:
         """Extract and filter links from the page"""
         links = []
         discovered_urls = []
-        
+        all_found = []
         try:
             for tag in soup.find_all('a', href=True):
                 href = tag['href'].strip()
                 if not href:
                     continue
-                
+                all_found.append(href)
                 # Convert relative URLs to absolute
                 try:
                     absolute_link = urljoin(current_url, href)
                 except Exception as e:
                     logger.warning(f"Error joining URL {current_url} with {href}: {e}")
                     continue
-                
                 # Normalize the URL
                 normalized_link = self.normalize_url(absolute_link)
-                
-                # Filter out unwanted links
+                # Relaxed filter: allow all links that are internal to CNN
                 if (not absolute_link.startswith(('javascript:', 'mailto:', '#', 'tel:', 'ftp:')) and
                     not absolute_link.endswith(('.pdf', '.jpg', '.jpeg', '.png', '.gif', '.css', '.js')) and
-                    self.is_same_domain(base_url, absolute_link)):
-                    
+                    (absolute_link.startswith('https://edition.cnn.com') or absolute_link.startswith('/'))):
                     links.append(absolute_link)
                     discovered_urls.append(normalized_link)
-            
+            logger.info(f"[DEBUG] All <a href> found on {current_url}: {all_found}")
             logger.info(f"Found {len(links)} links on {current_url}")
             if links:
                 logger.info(f"Sample links: {links[:3]}")
-                
         except Exception as e:
             logger.error(f"Error extracting links from {current_url}: {e}")
-        
         return links, discovered_urls
     
     def establish_session(self, base_url):
@@ -463,9 +458,19 @@ class WebCrawler:
             # Get the raw HTML content
             html_content = response.text
             
+            # Debug: Log response details
+            logger.info(f"[DEBUG] Response status: {response.status_code}")
+            logger.info(f"[DEBUG] Response headers: {dict(response.headers)}")
+            logger.info(f"[DEBUG] Content length: {len(html_content)}")
+            logger.info(f"[DEBUG] First 500 chars: {html_content[:500]}")
+            
             # Check if we got a real page or a bot detection page
             if len(html_content) < 1000 or 'access denied' in html_content.lower() or 'blocked' in html_content.lower():
                 logger.warning(f"Possible bot detection page for {url} - content length: {len(html_content)}")
+            
+            # Check if content looks like HTML
+            if not html_content.strip().startswith('<'):
+                logger.warning(f"Content doesn't look like HTML for {url} - starts with: {html_content[:100]}")
             
             soup = BeautifulSoup(html_content, 'html.parser')
             
