@@ -1,0 +1,31 @@
+FROM python:3.11-slim
+
+# Set working directory
+WORKDIR /app
+
+# Copy requirements first for better caching
+COPY requirements_ui.txt .
+
+# Install Python dependencies
+RUN pip install --no-cache-dir -r requirements_ui.txt
+
+# Copy application code
+COPY templates.py .
+
+# Set environment variables
+ENV UI_PORT=5000
+ENV CRAWLER_SERVER_URL=http://crawler:5001
+ENV DEBUG=False
+
+# Expose port
+EXPOSE 5000
+
+# Copy the UI server
+COPY ui_server.py .
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:5000/api/health || exit 1
+
+# Run the UI server
+CMD ["python", "ui_server.py"] 

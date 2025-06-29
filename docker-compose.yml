@@ -1,0 +1,55 @@
+version: '3.8'
+
+services:
+  crawler:
+    build:
+      context: .
+      dockerfile: Dockerfile.crawler
+    container_name: web-crawler-server
+    ports:
+      - "5001:5001"
+    environment:
+      - CRAWLER_PORT=5001
+      - DEBUG=False
+    volumes:
+      - /mnt/rbd0/crawler_data:/app/data
+    networks:
+      - crawler-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5001/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  ui:
+    build:
+      context: .
+      dockerfile: Dockerfile.ui
+    container_name: web-crawler-ui
+    ports:
+      - "5000:5000"
+    environment:
+      - UI_PORT=5000
+      - CRAWLER_SERVER_URL=http://crawler:5001
+      - DEBUG=False
+    depends_on:
+      crawler:
+        condition: service_healthy
+    networks:
+      - crawler-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+volumes:
+  crawler_data:
+
+networks:
+  crawler-network:
+    driver: bridge 

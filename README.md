@@ -1,205 +1,201 @@
-# Advanced Web Crawler - Interactive Dashboard
+# Web Crawler with Separated UI and Crawler Services
 
-A powerful, single-threaded web crawler with an interactive web dashboard for unlimited crawling with real-time monitoring and data management.
+A web crawler application with a clean separation between the UI and crawling logic, containerized with Docker for easy deployment.
 
-## 🚀 Features
+## Architecture
 
-### Core Crawling
-- **Unlimited Crawling**: No depth or page restrictions
-- **Single-Threaded**: Simple, reliable, and respectful crawling
-- **Smart Discovery**: Automatically finds and queues new URLs
-- **Global Queue System**: Persistent URL queue across sessions
-- **Priority System**: Different priority levels for URL processing
+The application is split into two separate services:
 
-### Interactive Web Dashboard
-- **Modern UI**: Beautiful, responsive design with gradient themes
-- **Real-Time Updates**: Live queue status and progress monitoring
-- **AJAX Interface**: No page refreshes needed for most operations
-- **Search & Pagination**: Advanced data browsing with search functionality
-- **Modal Details**: Detailed URL information in popup modals
-- **Auto-Refresh**: Configurable automatic updates for queue status
+- **UI Server** (`ui_server.py`): Handles the web interface and user interactions
+- **Crawler Server** (`crawler_server.py`): Handles all web crawling operations and data processing
 
-### API Endpoints
-- `GET /api/queue-state` - Get current crawl queue status
-- `GET /api/global-queue-state` - Get global queue information
-- `GET /api/crawled-data` - Get crawled data with pagination and search
-- `GET /api/url-details` - Get detailed information about a specific URL
-- `POST /api/start-crawl` - Start a new crawl operation
-- `GET /api/stop-crawl` - Stop the current crawl
-- `POST /api/clear-queue` - Clear the global queue
-- `GET /api/stats` - Get URL history statistics
+The services communicate via REST API calls, providing better scalability and maintainability.
+
+## Features
+
+- **Separated Services**: Clean separation between UI and crawling logic
+- **REST API**: Full REST API for all crawling operations
+- **Docker Support**: Containerized deployment with Docker and Docker Compose
+- **Health Checks**: Built-in health monitoring for both services
+- **Cross-Origin Support**: CORS enabled for service communication
+- **Database Persistence**: SQLite databases for URL history and crawled content
+- **Real-time Status**: Live queue and crawling status updates
+
+## Quick Start with Docker
+
+### Prerequisites
+
+- Docker
+- Docker Compose
+
+### Running the Services
+
+1. **Start both services:**
+   ```bash
+   ./start.sh
+   ```
+   Or manually:
+   ```bash
+   docker-compose up --build -d
+   ```
+
+2. **Access the application:**
+   - UI Server: http://localhost:5000
+   - Crawler Server API: http://localhost:5001
+
+3. **View logs:**
+   ```bash
+   docker-compose logs -f
+   ```
+
+4. **Stop services:**
+   ```bash
+   docker-compose down
+   ```
+
+## Manual Setup (Development)
+
+### Prerequisites
+
+- Python 3.11+
+- pip
+
+### Crawler Server Setup
+
+1. **Install dependencies:**
+   ```bash
+   pip install -r requirements_crawler.txt
+   ```
+
+2. **Run the crawler server:**
+   ```bash
+   python crawler_server.py
+   ```
+   
+   The crawler server will start on port 5001.
+
+### UI Server Setup
+
+1. **Install dependencies:**
+   ```bash
+   pip install -r requirements_ui.txt
+   ```
+
+2. **Set environment variables:**
+   ```bash
+   export CRAWLER_SERVER_URL=http://localhost:5001
+   ```
+
+3. **Run the UI server:**
+   ```bash
+   python ui_server.py
+   ```
+   
+   The UI server will start on port 5000.
+
+## API Endpoints
+
+### Crawler Server API (Port 5001)
+
+- `GET /api/health` - Health check
+- `POST /api/start-crawl` - Start crawling a URL
+- `POST /api/stop-crawl` - Stop crawling
+- `GET /api/crawl-status` - Get crawling status
+- `GET /api/stats` - Get URL statistics
 - `GET /api/recent` - Get recently visited URLs
-- `GET /api/most-visited` - Get most frequently visited URLs
+- `GET /api/most-visited` - Get most visited URLs
+- `GET /api/url-info` - Get specific URL information
+- `GET /api/html-content` - Get HTML content for a URL
+- `GET /api/queue-state` - Get queue state
+- `GET /api/crawled-data` - Get all crawled data
+- `GET /api/url-details` - Get detailed URL information
 
-## 🛠️ Installation
+### UI Server API (Port 5000)
 
-1. Clone the repository:
-```bash
-git clone <repository-url>
-cd data_collections
+The UI server provides proxy endpoints that forward requests to the crawler server:
+- All `/api/*` endpoints are proxied to the crawler server
+- `GET /api/health` - UI server health check
+
+## Environment Variables
+
+### Crawler Server
+- `CRAWLER_PORT` - Port for the crawler server (default: 5001)
+- `DEBUG` - Enable debug mode (default: False)
+
+### UI Server
+- `UI_PORT` - Port for the UI server (default: 5000)
+- `CRAWLER_SERVER_URL` - URL of the crawler server (default: http://localhost:5001)
+- `DEBUG` - Enable debug mode (default: False)
+
+## Docker Configuration
+
+### Services
+
+- **crawler**: Runs the crawler server on port 5001
+- **ui**: Runs the UI server on port 5000
+
+### Volumes
+
+- `crawler_data`: Persistent storage for crawler data
+- Database files are mounted from the host for persistence
+
+### Networks
+
+- `crawler-network`: Internal network for service communication
+
+## Development
+
+### Project Structure
+
+```
+data_collections/
+├── crawler_server.py      # Crawler service
+├── ui_server.py          # UI service
+├── crawler_logic.py      # Core crawling logic
+├── url_manager.py        # URL management
+├── templates.py          # HTML templates
+├── requirements_crawler.txt  # Crawler dependencies
+├── requirements_ui.txt      # UI dependencies
+├── Dockerfile.crawler    # Crawler Dockerfile
+├── Dockerfile.ui         # UI Dockerfile
+├── docker-compose.yml    # Docker Compose configuration
+└── start.sh             # Startup script
 ```
 
-2. Install dependencies:
-```bash
-pip install -r requirements.txt
-```
+### Adding New Features
 
-3. Run the web application:
-```bash
-python web_app.py
-```
+1. **Crawler Logic**: Add new functionality to `crawler_logic.py`
+2. **API Endpoints**: Add new endpoints to `crawler_server.py`
+3. **UI Features**: Update `ui_server.py` and `templates.py`
+4. **Dependencies**: Update the appropriate requirements file
 
-4. Open your browser and navigate to:
-```
-http://localhost:5000
-```
+## Troubleshooting
 
-## 📊 Dashboard Features
+### Service Communication Issues
 
-### Crawl Website Tab
-- **Interactive Form**: AJAX-powered crawl initiation
-- **Real-Time Feedback**: Immediate status updates
-- **Stop Control**: Ability to stop crawling at any time
-- **Progress Tracking**: Live progress indicators
+1. **Check service health:**
+   ```bash
+   curl http://localhost:5001/api/health
+   curl http://localhost:5000/api/health
+   ```
 
-### Queue Status Tab
-- **Live Metrics**: Real-time queue statistics
-- **Progress Bar**: Visual progress indication
-- **Current URL**: Shows currently processing URL
-- **Error Logging**: Recent error display
-- **Auto-Refresh**: Configurable automatic updates
+2. **View service logs:**
+   ```bash
+   docker-compose logs crawler
+   docker-compose logs ui
+   ```
 
-### Global Queue Tab
-- **Queue Management**: View and manage global queue
-- **Priority Display**: Visual priority indicators
-- **Queue Actions**: Clear all or domain-specific queues
-- **Pending URLs**: List of queued URLs
+3. **Restart services:**
+   ```bash
+   docker-compose restart
+   ```
 
-### View Saved Data Tab
-- **Search Functionality**: Search URLs and titles
-- **Pagination**: Navigate through large datasets
-- **Content Preview**: Quick content overview
-- **HTML Viewing**: Direct HTML content access
-- **URL Details**: Modal popup with detailed information
-- **Export Options**: View raw HTML content
+### Database Issues
 
-### URL History Tab
-- **Statistics Overview**: Comprehensive crawling stats
-- **Recent Activity**: Recently visited URLs
-- **Most Visited**: Frequently accessed pages
-- **Time Analysis**: Temporal crawling patterns
+- Database files are persisted in the host directory
+- Check file permissions if databases are not accessible
+- Ensure the data directory exists and is writable
 
-## 🔧 Configuration
-
-### Environment Variables
-- `FLASK_HOST`: Server host (default: 127.0.0.1)
-- `FLASK_PORT`: Server port (default: 5000)
-- `FLASK_DEBUG`: Debug mode (default: True)
-
-### Database Files
-- `web_crawler.db`: Content database
-- `url_history.db`: URL history database
-- `global_queue.db`: Global queue database
-
-## 🎯 Usage Examples
-
-### Starting a Crawl
-1. Navigate to the "Crawl Website" tab
-2. Enter the target URL (e.g., `https://example.com`)
-3. Click "Start Unlimited Crawling"
-4. Monitor progress in the "Queue Status" tab
-
-### Searching Crawled Data
-1. Go to the "View Saved Data" tab
-2. Use the search box to find specific URLs or titles
-3. Navigate through pages using pagination
-4. Click "Details" to view comprehensive URL information
-
-### Monitoring Queue Status
-1. Switch to the "Queue Status" tab
-2. Enable auto-refresh for real-time updates
-3. View current processing URL and progress
-4. Monitor error logs and completion statistics
-
-## 🧪 Testing
-
-Run the API test script to verify all endpoints:
-```bash
-python test_web_api.py
-```
-
-## 🔍 API Documentation
-
-### Start Crawl
-```bash
-curl -X POST http://localhost:5000/api/start-crawl \
-  -H "Content-Type: application/json" \
-  -d '{"url": "https://example.com"}'
-```
-
-### Get Queue State
-```bash
-curl http://localhost:5000/api/queue-state
-```
-
-### Get Crawled Data
-```bash
-curl "http://localhost:5000/api/crawled-data?page=1&per_page=20&search=example"
-```
-
-### Get URL Details
-```bash
-curl "http://localhost:5000/api/url-details?url=https://example.com"
-```
-
-## 🎨 UI Features
-
-### Modern Design
-- **Gradient Themes**: Beautiful color schemes
-- **Responsive Layout**: Works on desktop and mobile
-- **Smooth Animations**: Hover effects and transitions
-- **Loading Indicators**: Visual feedback for operations
-
-### Interactive Elements
-- **Tab Navigation**: Easy switching between sections
-- **Modal Dialogs**: Detailed information popups
-- **Real-Time Updates**: Live data without page refresh
-- **Search & Filter**: Advanced data exploration
-
-### User Experience
-- **Intuitive Interface**: Easy to understand and use
-- **Visual Feedback**: Clear status indicators
-- **Error Handling**: Graceful error display
-- **Mobile Friendly**: Responsive design for all devices
-
-## 🔧 Technical Details
-
-### Architecture
-- **Flask Backend**: Python web framework
-- **SQLite Databases**: Lightweight data storage
-- **AJAX Frontend**: Dynamic user interface
-- **Threading**: Background crawl processing
-
-### Data Storage
-- **Content Database**: Stores crawled HTML and text
-- **URL History**: Tracks visit statistics and metadata
-- **Global Queue**: Manages URL processing queue
-
-### Performance
-- **Single-Threaded**: Simple and reliable
-- **Respectful Crawling**: 0.5 second delays between requests
-- **Efficient Storage**: Optimized database queries
-- **Real-Time Updates**: Minimal latency for status updates
-
-## 🚀 Future Enhancements
-
-- **Multi-threading Support**: Parallel crawling options
-- **Advanced Filtering**: More sophisticated search capabilities
-- **Data Export**: CSV/JSON export functionality
-- **Scheduling**: Automated crawl scheduling
-- **Authentication**: User management system
-- **API Rate Limiting**: Enhanced API security
-
-## 📝 License
+## License
 
 This project is open source and available under the MIT License. 
