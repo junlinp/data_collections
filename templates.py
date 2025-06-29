@@ -828,18 +828,38 @@ HTML_TEMPLATE = """
                 }
             });
             
-            // Show crawl tab by default
-            const crawlTab = document.getElementById('crawl-tab');
-            if (crawlTab) {
-                crawlTab.style.display = 'block';
-                console.log('Showing crawl tab by default');
-            }
+            // Check if there's data available and show data tab by default
+            const totalPages = document.getElementById('total-pages');
+            const hasData = totalPages && parseInt(totalPages.textContent) > 0;
             
-            // Set the first tab (Crawl Website) as active
-            const firstTab = document.querySelector('.nav-tabs a[href="#crawl"]');
-            if (firstTab) {
-                firstTab.classList.add('active');
-                console.log('Set crawl tab as active');
+            if (hasData) {
+                // Show data tab by default if there's data
+                const dataTab = document.getElementById('data-tab');
+                if (dataTab) {
+                    dataTab.style.display = 'block';
+                    console.log('Showing data tab by default (data available)');
+                }
+                
+                // Set the data tab as active
+                const dataTabLink = document.querySelector('.nav-tabs a[href="#data"]');
+                if (dataTabLink) {
+                    dataTabLink.classList.add('active');
+                    console.log('Set data tab as active');
+                }
+            } else {
+                // Show crawl tab by default if no data
+                const crawlTab = document.getElementById('crawl-tab');
+                if (crawlTab) {
+                    crawlTab.style.display = 'block';
+                    console.log('Showing crawl tab by default (no data)');
+                }
+                
+                // Set the first tab (Crawl Website) as active
+                const firstTab = document.querySelector('.nav-tabs a[href="#crawl"]');
+                if (firstTab) {
+                    firstTab.classList.add('active');
+                    console.log('Set crawl tab as active');
+                }
             }
             
             // Always refresh queue state on page load to show current status

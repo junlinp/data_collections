@@ -55,6 +55,55 @@ services:
       retries: 3
       start_period: 40s
 
+  llm-processor:
+    build:
+      context: .
+      dockerfile: Dockerfile.llm
+    container_name: web-llm-processor
+    network_mode: host
+    environment:
+      - LLM_PORT=5003
+      - DEBUG=False
+      - CONTENT_DB_PATH=/app/data/web_crawler.db
+      - SUMMARY_DB_PATH=/app/data/summaries.db
+      - LOCAL_LLM_URL=http://localhost:11434
+      - LOCAL_LLM_MODEL=deepseek-r1:latest
+    volumes:
+      - /mnt/rbd0/crawler_data:/app/data
+    depends_on:
+      crawler:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:5003/api/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  summary-display:
+    build:
+      context: .
+      dockerfile: Dockerfile.summary
+    container_name: web-summary-display
+    network_mode: host
+    environment:
+      - SUMMARY_PORT=5004
+      - DEBUG=False
+      - SUMMARY_DB_PATH=/app/data/summaries.db
+      - LLM_PROCESSOR_URL=http://localhost:5003
+    volumes:
+      - /mnt/rbd0/crawler_data:/app/data
+    depends_on:
+      llm-processor:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:5004/api/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
 
 volumes:
   crawler_data:

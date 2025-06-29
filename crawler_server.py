@@ -18,8 +18,12 @@ logger = logging.getLogger(__name__)
 app = Flask(__name__)
 CORS(app)  # Enable CORS for cross-origin requests
 
-# Initialize the web crawler
-crawler = WebCrawler()
+# Get database paths from environment variables
+content_db_path = os.getenv('CONTENT_DB_PATH', '/app/data/web_crawler.db')
+url_history_db_path = os.getenv('URL_HISTORY_DB_PATH', '/app/data/url_history.db')
+
+# Initialize the web crawler with proper database paths
+crawler = WebCrawler(content_db_path=content_db_path, url_history_db_path=url_history_db_path)
 
 # Global variable to track if crawling is in progress
 crawling_in_progress = False

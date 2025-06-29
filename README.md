@@ -1,201 +1,391 @@
-# Web Crawler with Separated UI and Crawler Services
+# Web Crawler with AI Summarization
 
-A web crawler application with a clean separation between the UI and crawling logic, containerized with Docker for easy deployment.
+A comprehensive web crawling and AI summarization system with a modern web UI. The system consists of four main components:
 
-## Architecture
-
-The application is split into two separate services:
-
-- **UI Server** (`ui_server.py`): Handles the web interface and user interactions
-- **Crawler Server** (`crawler_server.py`): Handles all web crawling operations and data processing
-
-The services communicate via REST API calls, providing better scalability and maintainability.
+1. **Web Crawler Server** - Crawls websites and stores content in a database
+2. **Web UI** - Modern interface for managing crawls and viewing results
+3. **LLM Processor** - Processes crawled content using local LLM models
+4. **Summary Display Server** - Web interface for viewing AI-generated summaries
 
 ## Features
 
-- **Separated Services**: Clean separation between UI and crawling logic
-- **REST API**: Full REST API for all crawling operations
-- **Docker Support**: Containerized deployment with Docker and Docker Compose
-- **Health Checks**: Built-in health monitoring for both services
-- **Cross-Origin Support**: CORS enabled for service communication
-- **Database Persistence**: SQLite databases for URL history and crawled content
-- **Real-time Status**: Live queue and crawling status updates
+- **Web Crawling**: Crawl websites with configurable depth and rate limiting
+- **Content Storage**: Persistent SQLite database storage
+- **AI Summarization**: Generate structured summaries using local LLM models
+- **Modern UI**: Clean, responsive web interface
+- **Health Monitoring**: Built-in health checks for all services
+- **Docker Support**: Complete containerized deployment
+- **Proxy Support**: Configurable HTTP/HTTPS proxy settings
 
-## Quick Start with Docker
+## Prerequisites
 
-### Prerequisites
+### Local LLM Setup
 
-- Docker
-- Docker Compose
+This system uses local LLM models instead of cloud APIs. You need to set up Ollama on your host machine:
 
-### Running the Services
-
-1. **Start both services:**
+1. **Install Ollama**:
    ```bash
-   ./start.sh
-   ```
-   Or manually:
-   ```bash
-   docker-compose up --build -d
-   ```
-
-2. **Access the application:**
-   - UI Server: http://localhost:5000
-   - Crawler Server API: http://localhost:5001
-
-3. **View logs:**
-   ```bash
-   docker-compose logs -f
-   ```
-
-4. **Stop services:**
-   ```bash
-   docker-compose down
-   ```
-
-## Manual Setup (Development)
-
-### Prerequisites
-
-- Python 3.11+
-- pip
-
-### Crawler Server Setup
-
-1. **Install dependencies:**
-   ```bash
-   pip install -r requirements_crawler.txt
-   ```
-
-2. **Run the crawler server:**
-   ```bash
-   python crawler_server.py
-   ```
+   # On Linux/macOS
+   curl -fsSL https://ollama.ai/install.sh | sh
    
-   The crawler server will start on port 5001.
-
-### UI Server Setup
-
-1. **Install dependencies:**
-   ```bash
-   pip install -r requirements_ui.txt
+   # Or download from https://ollama.ai/download
    ```
 
-2. **Set environment variables:**
+2. **Start Ollama service**:
    ```bash
-   export CRAWLER_SERVER_URL=http://localhost:5001
+   ollama serve
    ```
 
-3. **Run the UI server:**
+3. **Download a model** (e.g., Llama 2):
    ```bash
-   python ui_server.py
+   ollama pull llama2
    ```
-   
-   The UI server will start on port 5000.
 
-## API Endpoints
+4. **Verify installation**:
+   ```bash
+   curl http://localhost:11434/api/tags
+   ```
 
-### Crawler Server API (Port 5001)
+### Docker and Docker Compose
 
+Ensure you have Docker and Docker Compose installed on your system.
+
+## Quick Start
+
+1. **Clone the repository**:
+   ```bash
+   git clone <repository-url>
+   cd data_collections
+   ```
+
+2. **Start the services**:
+   ```bash
+   docker-compose up -d
+   ```
+
+3. **Access the services**:
+   - Web Crawler UI: http://localhost:5002
+   - Summary Display: http://localhost:5004
+   - Crawler API: http://localhost:5001
+   - LLM Processor API: http://localhost:5003
+
+## Service Architecture
+
+### 1. Web Crawler Server (Port 5001)
+
+**Purpose**: Crawls websites and stores content in a database.
+
+**Features**:
+- Configurable crawl depth and rate limiting
+- Proxy support for network access
+- URL deduplication and history tracking
+- Health monitoring
+
+**API Endpoints**:
 - `GET /api/health` - Health check
-- `POST /api/start-crawl` - Start crawling a URL
-- `POST /api/stop-crawl` - Stop crawling
-- `GET /api/crawl-status` - Get crawling status
-- `GET /api/stats` - Get URL statistics
-- `GET /api/recent` - Get recently visited URLs
-- `GET /api/most-visited` - Get most visited URLs
-- `GET /api/url-info` - Get specific URL information
-- `GET /api/html-content` - Get HTML content for a URL
-- `GET /api/queue-state` - Get queue state
-- `GET /api/crawled-data` - Get all crawled data
-- `GET /api/url-details` - Get detailed URL information
+- `POST /api/crawl` - Start a new crawl
+- `GET /api/status` - Get crawl status
+- `GET /api/urls` - Get crawled URLs
+- `GET /api/content/<url>` - Get content for specific URL
 
-### UI Server API (Port 5000)
+**Environment Variables**:
+- `CRAWLER_PORT` - Server port (default: 5001)
+- `DEBUG` - Debug mode (default: False)
+- `HTTP_PROXY` / `HTTPS_PROXY` - Proxy settings
+- `CONTENT_DB_PATH` - Database path (default: /app/data/web_crawler.db)
+- `URL_HISTORY_DB_PATH` - URL history database path
 
-The UI server provides proxy endpoints that forward requests to the crawler server:
-- All `/api/*` endpoints are proxied to the crawler server
-- `GET /api/health` - UI server health check
+### 2. Web UI (Port 5002)
 
-## Environment Variables
+**Purpose**: Modern web interface for managing crawls and viewing results.
 
-### Crawler Server
-- `CRAWLER_PORT` - Port for the crawler server (default: 5001)
-- `DEBUG` - Enable debug mode (default: False)
+**Features**:
+- Real-time crawl status monitoring
+- URL management and search
+- Content preview
+- Responsive design
 
-### UI Server
-- `UI_PORT` - Port for the UI server (default: 5000)
-- `CRAWLER_SERVER_URL` - URL of the crawler server (default: http://localhost:5001)
-- `DEBUG` - Enable debug mode (default: False)
+**Environment Variables**:
+- `UI_PORT` - Server port (default: 5002)
+- `CRAWLER_SERVER_URL` - Crawler API URL
+- `DEBUG` - Debug mode (default: False)
 
-## Docker Configuration
+### 3. LLM Processor (Port 5003)
 
-### Services
+**Purpose**: Processes crawled content using local LLM models to generate summaries.
 
-- **crawler**: Runs the crawler server on port 5001
-- **ui**: Runs the UI server on port 5000
+**Features**:
+- Local LLM integration (Ollama)
+- Structured summary generation
+- Key points extraction
+- Sentiment analysis
+- Fallback processing when LLM is unavailable
 
-### Volumes
+**API Endpoints**:
+- `GET /api/health` - Health check with LLM status
+- `POST /api/process-all` - Process all unprocessed URLs
+- `POST /api/process-url` - Process specific URL
+- `GET /api/status` - Get processing status
+- `GET /api/summaries` - Get all summaries (paginated)
+- `GET /api/summary/<url>` - Get summary for specific URL
 
-- `crawler_data`: Persistent storage for crawler data
-- Database files are mounted from the host for persistence
+**Environment Variables**:
+- `LLM_PORT` - Server port (default: 5003)
+- `DEBUG` - Debug mode (default: False)
+- `CONTENT_DB_PATH` - Source content database path
+- `SUMMARY_DB_PATH` - Summary database path
+- `LOCAL_LLM_URL` - Local LLM server URL (default: http://host.docker.internal:11434)
+- `LOCAL_LLM_MODEL` - LLM model name (default: deepseek-r1:latest)
 
-### Networks
+### 4. Summary Display Server (Port 5004)
 
-- `crawler-network`: Internal network for service communication
+**Purpose**: Web interface for viewing and managing AI-generated summaries.
 
-## Development
+**Features**:
+- Summary browsing and search
+- Processing status monitoring
+- Pagination support
+- Direct LLM processor integration
 
-### Project Structure
+**API Endpoints**:
+- `GET /api/health` - Health check
+- `GET /api/summaries` - Get summaries (proxied to LLM processor)
+- `POST /api/process-all` - Trigger processing (proxied to LLM processor)
+- `GET /api/status` - Get status (proxied to LLM processor)
 
+**Environment Variables**:
+- `SUMMARY_PORT` - Server port (default: 5004)
+- `DEBUG` - Debug mode (default: False)
+- `SUMMARY_DB_PATH` - Summary database path
+- `LLM_PROCESSOR_URL` - LLM processor API URL
+
+## Database Schemas
+
+### Web Content Database (web_crawler.db)
+
+```sql
+CREATE TABLE web_content (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    url TEXT UNIQUE NOT NULL,
+    title TEXT,
+    html_content TEXT,
+    text_content TEXT,
+    status_code INTEGER,
+    crawl_depth INTEGER,
+    parent_url TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE url_history (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    url TEXT NOT NULL,
+    status TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
 ```
-data_collections/
-├── crawler_server.py      # Crawler service
-├── ui_server.py          # UI service
-├── crawler_logic.py      # Core crawling logic
-├── url_manager.py        # URL management
-├── templates.py          # HTML templates
-├── requirements_crawler.txt  # Crawler dependencies
-├── requirements_ui.txt      # UI dependencies
-├── Dockerfile.crawler    # Crawler Dockerfile
-├── Dockerfile.ui         # UI Dockerfile
-├── docker-compose.yml    # Docker Compose configuration
-└── start.sh             # Startup script
+
+### Summary Database (summaries.db)
+
+```sql
+CREATE TABLE summaries (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    url TEXT UNIQUE NOT NULL,
+    title TEXT,
+    summary TEXT NOT NULL,
+    key_points TEXT,
+    sentiment TEXT,
+    word_count INTEGER,
+    processing_time REAL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
 ```
 
-### Adding New Features
+## Usage
 
-1. **Crawler Logic**: Add new functionality to `crawler_logic.py`
-2. **API Endpoints**: Add new endpoints to `crawler_server.py`
-3. **UI Features**: Update `ui_server.py` and `templates.py`
-4. **Dependencies**: Update the appropriate requirements file
+### Starting a Crawl
+
+1. Open the Web UI at http://localhost:5002
+2. Enter a URL to crawl
+3. Set crawl depth and other options
+4. Click "Start Crawl"
+5. Monitor progress in real-time
+
+### Generating Summaries
+
+1. Ensure Ollama is running with a model loaded
+2. Open the Summary Display at http://localhost:5004
+3. Click "Process All URLs" to generate summaries for all crawled content
+4. View generated summaries with key points and sentiment analysis
+
+### API Usage
+
+**Start a crawl**:
+```bash
+curl -X POST http://localhost:5001/api/crawl \
+  -H "Content-Type: application/json" \
+  -d '{"url": "https://example.com", "max_depth": 2}'
+```
+
+**Process all URLs for summarization**:
+```bash
+curl -X POST http://localhost:5003/api/process-all
+```
+
+**Get summaries**:
+```bash
+curl http://localhost:5003/api/summaries?page=1&per_page=10
+```
+
+## Configuration
+
+### Local LLM Configuration
+
+The system is configured to use Ollama by default. You can customize the LLM setup:
+
+1. **Change the model**:
+   ```bash
+   # Pull a different model
+   ollama pull mistral
+   
+   # Update environment variable
+   export LOCAL_LLM_MODEL=mistral
+   ```
+
+2. **Customize LLM settings** in `llm_processor.py`:
+   - Temperature and other generation parameters
+   - Prompt templates
+   - Text processing limits
+
+### Proxy Configuration
+
+If you need to use a proxy for internet access:
+
+```yaml
+environment:
+  - HTTP_PROXY=http://your-proxy:port
+  - HTTPS_PROXY=http://your-proxy:port
+  - NO_PROXY=localhost,127.0.0.1
+```
+
+### Database Persistence
+
+All databases are stored in `/mnt/rbd0/crawler_data` on the host machine and mounted into the containers. Ensure this directory exists and has proper permissions.
 
 ## Troubleshooting
 
-### Service Communication Issues
+### LLM Processor Issues
 
-1. **Check service health:**
-   ```bash
-   curl http://localhost:5001/api/health
-   curl http://localhost:5000/api/health
-   ```
+1. **LLM server not available**:
+   - Ensure Ollama is running: `ollama serve`
+   - Check if model is downloaded: `ollama list`
+   - Verify API endpoint: `curl http://localhost:11434/api/tags`
 
-2. **View service logs:**
-   ```bash
-   docker-compose logs crawler
-   docker-compose logs ui
-   ```
+2. **Processing fails**:
+   - Check logs: `docker-compose logs llm-processor`
+   - Verify database connectivity
+   - Check if content exists in source database
 
-3. **Restart services:**
-   ```bash
-   docker-compose restart
-   ```
+### Crawler Issues
+
+1. **403 Forbidden errors**:
+   - Some sites have anti-bot protection
+   - Try different user agents or proxy settings
+   - Consider adding delays between requests
+
+2. **Network connectivity**:
+   - Verify proxy settings
+   - Check container network configuration
+   - Ensure host machine has internet access
 
 ### Database Issues
 
-- Database files are persisted in the host directory
-- Check file permissions if databases are not accessible
-- Ensure the data directory exists and is writable
+1. **Data not persisting**:
+   - Verify volume mounts in docker-compose.yml
+   - Check host directory permissions
+   - Ensure database paths are correctly set
+
+2. **Database corruption**:
+   - Backup data before troubleshooting
+   - Check disk space on host
+   - Verify SQLite database integrity
+
+## Development
+
+### Local Development
+
+1. **Clone and setup**:
+   ```bash
+   git clone <repository-url>
+   cd data_collections
+   ```
+
+2. **Install dependencies**:
+   ```bash
+   pip install -r requirements.txt
+   pip install -r requirements_llm.txt
+   ```
+
+3. **Run services individually**:
+   ```bash
+   # Terminal 1: Crawler
+   python crawler_server.py
+   
+   # Terminal 2: UI
+   python ui_server.py
+   
+   # Terminal 3: LLM Processor
+   python llm_processor.py
+   
+   # Terminal 4: Summary Display
+   python summary_display_server.py
+   ```
+
+### Adding New Features
+
+1. **New API endpoints**: Add routes to the respective Flask applications
+2. **Database changes**: Update schemas and migration scripts
+3. **UI improvements**: Modify HTML templates and JavaScript
+4. **LLM enhancements**: Customize prompts and processing logic
+
+### Testing
+
+1. **Unit tests**: Add tests for individual components
+2. **Integration tests**: Test service interactions
+3. **End-to-end tests**: Test complete workflows
+
+## Security Considerations
+
+- The system runs in containers with limited privileges
+- Database files should have appropriate permissions
+- Consider using secrets management for sensitive configuration
+- Monitor resource usage and implement rate limiting
+- Regular security updates for base images
+
+## Performance Optimization
+
+- Adjust crawl delays based on target site policies
+- Optimize database queries for large datasets
+- Consider using connection pooling for database connections
+- Monitor memory usage of LLM processing
+- Implement caching for frequently accessed data
 
 ## License
 
-This project is open source and available under the MIT License. 
+This project is licensed under the MIT License - see the LICENSE file for details.
+
+## Contributing
+
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Test thoroughly
+5. Submit a pull request
+
+## Support
+
+For issues and questions:
+1. Check the troubleshooting section
+2. Review the logs
+3. Create an issue with detailed information 
