@@ -1,149 +1,57 @@
-import sqlite3
 from datetime import datetime, timedelta
 from urllib.parse import urlparse
 import json
+from mongo_utils import get_mongo_manager
 
 class URLManager:
-    def __init__(self, db_path='url_history.db'):
-        self.db_path = db_path
+    def __init__(self):
+        self.mongo_manager = get_mongo_manager()
         self.init_db()
     
     def init_db(self):
-        """Initialize the URL history database"""
-        conn = sqlite3.connect(self.db_path)
-        cursor = conn.cursor()
-        
-        # Create URL history table
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS url_history (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                url TEXT NOT NULL,
-                domain TEXT NOT NULL,
-                first_visited TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                last_visited TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                visit_count INTEGER DEFAULT 1,
-                crawl_depth INTEGER DEFAULT 0,
-                status_code INTEGER,
-                response_time REAL,
-                content_length INTEGER,
-                metadata TEXT
-            )
-        ''')
-        
-        # Create index for faster lookups
-        cursor.execute('''
-            CREATE INDEX IF NOT EXISTS idx_url_history_url 
-            ON url_history(url)
-        ''')
-        
-        cursor.execute('''
-            CREATE INDEX IF NOT EXISTS idx_url_history_domain 
-            ON url_history(domain)
-        ''')
-        
-        cursor.execute('''
-            CREATE INDEX IF NOT EXISTS idx_url_history_last_visited 
-            ON url_history(last_visited)
-        ''')
-        
-        conn.commit()
-        conn.close()
+        """Initialize the MongoDB connection"""
+        # MongoDB connection is already initialized in constructor
+        pass
     
     def add_url(self, url, crawl_depth=0, status_code=None, response_time=None, 
                 content_length=None, metadata=None):
-        """Add or update a URL in the history"""
-        domain = self.extract_domain(url)
-        
-        conn = sqlite3.connect(self.db_path)
-        cursor = conn.cursor()
-        
+        """Add or update a URL in the history using MongoDB"""
         try:
-            # Check if URL already exists
-            cursor.execute('''
-                SELECT id, visit_count, first_visited 
-                FROM url_history 
-                WHERE url = ?
-            ''', (url,))
+            # For now, use a simple status approach
+            status = f"crawl_depth:{crawl_depth},status_code:{status_code},response_time:{response_time}"
+            if metadata:
+                status += f",metadata:{json.dumps(metadata)}"
             
-            existing = cursor.fetchone()
-            
-            if existing:
-                # Update existing record
-                url_id, current_count, first_visited = existing
-                cursor.execute('''
-                    UPDATE url_history 
-                    SET last_visited = ?, 
-                        visit_count = ?, 
-                        crawl_depth = ?,
-                        status_code = ?,
-                        response_time = ?,
-                        content_length = ?,
-                        metadata = ?
-                    WHERE id = ?
-                ''', (
-                    datetime.now(),
-                    current_count + 1,
-                    crawl_depth,
-                    status_code,
-                    response_time,
-                    content_length,
-                    json.dumps(metadata) if metadata else None,
-                    url_id
-                ))
-            else:
-                # Insert new record
-                cursor.execute('''
-                    INSERT INTO url_history 
-                    (url, domain, crawl_depth, status_code, response_time, content_length, metadata)
-                    VALUES (?, ?, ?, ?, ?, ?, ?)
-                ''', (
-                    url,
-                    domain,
-                    crawl_depth,
-                    status_code,
-                    response_time,
-                    content_length,
-                    json.dumps(metadata) if metadata else None
-                ))
-            
-            conn.commit()
-            return True
+            # Save to MongoDB using existing method
+            result = self.mongo_manager.save_url_history(url, status)
+            return result is not None
             
         except Exception as e:
             print(f"Error adding URL to history: {e}")
             return False
-        finally:
-            conn.close()
     
     def get_url_info(self, url):
-        """Get information about a specific URL"""
-        conn = sqlite3.connect(self.db_path)
-        cursor = conn.cursor()
-        
-        cursor.execute('''
-            SELECT url, domain, first_visited, last_visited, visit_count, 
-                   crawl_depth, status_code, response_time, content_length, metadata
-            FROM url_history 
-            WHERE url = ?
-        ''', (url,))
-        
-        row = cursor.fetchone()
-        conn.close()
-        
-        if row:
-            return {
-                'url': row[0],
-                'domain': row[1],
-                'first_visited': row[2],
-                'last_visited': row[3],
-                'visit_count': row[4],
-                'crawl_depth': row[5],
-                'status_code': row[6],
-                'response_time': row[7],
-                'content_length': row[8],
-                'metadata': json.loads(row[9]) if row[9] else None
-            }
-        return None
+        """Get information about a specific URL from MongoDB"""
+        try:
+            history = self.mongo_manager.get_url_history(url, limit=1)
+            if history:
+                latest = history[0]
+                return {
+                    'url': latest.get('url'),
+                    'domain': self.extract_domain(latest.get('url', '')),
+                    'first_visited': latest.get('created_at'),
+                    'last_visited': latest.get('created_at'),
+                    'visit_count': 1,  # Simplified for now
+                    'crawl_depth': 0,  # Would need to parse from status
+                    'status_code': None,  # Would need to parse from status
+                    'response_time': None,  # Would need to parse from status
+                    'content_length': None,
+                    'metadata': None  # Would need to parse from status
+                }
+            return None
+        except Exception as e:
+            print(f"Error getting URL info: {e}")
+            return None
     
     def is_recently_visited(self, url, hours=24):
         """Check if URL was visited within specified hours"""

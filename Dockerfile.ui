@@ -11,6 +11,7 @@ RUN pip install --no-cache-dir -r requirements_ui.txt
 
 # Copy application code
 COPY templates.py .
+COPY memory_utils.py .
 
 # Set environment variables
 ENV UI_PORT=5000
@@ -26,6 +27,16 @@ COPY ui_server.py .
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:5000/api/health || exit 1
+
+# Add ARG for proxy variables
+ARG http_proxy
+ARG https_proxy
+ARG HTTP_PROXY
+ARG HTTPS_PROXY
+ENV http_proxy=$http_proxy
+ENV https_proxy=$https_proxy
+ENV HTTP_PROXY=$HTTP_PROXY
+ENV HTTPS_PROXY=$HTTPS_PROXY
 
 # Run the UI server
 CMD ["python", "ui_server.py"] 

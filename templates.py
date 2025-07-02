@@ -1,13 +1,14 @@
 """
 HTML templates for the web crawler
 Separated from the main application for better maintainability
+Uses queue-based system with workers
 """
 
 HTML_TEMPLATE = """
 <!doctype html>
 <html>
 <head>
-    <title>Advanced Web Crawler - Interactive Dashboard</title>
+    <title>Queue-Based Web Crawler - Interactive Dashboard</title>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <style>
@@ -183,14 +184,14 @@ HTML_TEMPLATE = """
             box-shadow: 0 2px 10px rgba(102, 126, 234, 0.3);
         }
         
-        .crawl-settings { 
+        .queue-settings { 
             background: white; 
             padding: 25px; 
             border-radius: 15px; 
             margin: 20px 0;
             box-shadow: 0 2px 10px rgba(0,0,0,0.1);
         }
-        .crawl-settings label { 
+        .queue-settings label { 
             display: inline-block; 
             width: 120px; 
             margin-right: 15px;
@@ -295,7 +296,7 @@ HTML_TEMPLATE = """
             font-weight: 500;
         }
         
-        .current-url { 
+        .worker-status { 
             background: #e9ecef; 
             padding: 15px; 
             border-radius: 10px; 
@@ -314,7 +315,7 @@ HTML_TEMPLATE = """
             transform: scale(1.2);
         }
         
-        .unlimited-info { 
+        .queue-info { 
             background: linear-gradient(135deg, #e7f3ff 0%, #b3d9ff 100%);
             border: 2px solid #339af0; 
             padding: 25px; 
@@ -322,13 +323,13 @@ HTML_TEMPLATE = """
             margin: 20px 0;
             box-shadow: 0 2px 10px rgba(0,0,0,0.1);
         }
-        .unlimited-info h3 { 
+        .queue-info h3 { 
             color: #0056b3; 
             margin-top: 0;
             font-size: 1.5em;
         }
         
-        .single-thread-info { 
+        .worker-info { 
             background: linear-gradient(135deg, #fff2cc 0%, #ffeaa7 100%);
             border: 2px solid #fcc419; 
             padding: 15px; 
@@ -336,7 +337,7 @@ HTML_TEMPLATE = """
             margin: 15px 0;
         }
         
-        .global-queue-info { 
+        .24h-rule-info { 
             background: linear-gradient(135deg, #e8f5e8 0%, #c3e6cb 100%);
             border: 2px solid #51cf66; 
             padding: 25px; 
@@ -344,7 +345,7 @@ HTML_TEMPLATE = """
             margin: 20px 0;
             box-shadow: 0 2px 10px rgba(0,0,0,0.1);
         }
-        .global-queue-info h3 { 
+        .24h-rule-info h3 { 
             color: #155724; 
             margin-top: 0;
             font-size: 1.5em;
@@ -398,183 +399,178 @@ HTML_TEMPLATE = """
         }
         
         .pagination {
+            margin: 20px 0;
             display: flex;
             justify-content: center;
             align-items: center;
-            gap: 10px;
-            margin: 20px 0;
+            gap: 15px;
         }
-        
         .pagination button {
-            padding: 8px 15px;
+            padding: 8px 16px;
             font-size: 14px;
         }
         
         .loading {
             display: inline-block;
-            width: 20px;
-            height: 20px;
-            border: 3px solid #f3f3f3;
-            border-top: 3px solid #667eea;
+            width: 16px;
+            height: 16px;
+            border: 2px solid #ffffff;
             border-radius: 50%;
-            animation: spin 1s linear infinite;
+            border-top-color: transparent;
+            animation: spin 1s ease-in-out infinite;
         }
-        
         @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
+            to { transform: rotate(360deg); }
         }
         
-        .modal {
-            display: none;
-            position: fixed;
-            z-index: 1000;
-            left: 0;
-            top: 0;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(0,0,0,0.5);
+        .worker-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin: 20px 0;
         }
-        
-        .modal-content {
-            background-color: white;
-            margin: 5% auto;
-            padding: 30px;
-            border-radius: 15px;
-            width: 80%;
-            max-width: 800px;
-            max-height: 80vh;
-            overflow-y: auto;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
-        }
-        
-        .close {
-            color: #aaa;
-            float: right;
-            font-size: 28px;
-            font-weight: bold;
-            cursor: pointer;
-        }
-        
-        .close:hover {
-            color: #000;
-        }
-        
-        .url-details {
-            background: #f8f9fa;
+        .worker-card {
+            background: white;
             padding: 20px;
             border-radius: 10px;
-            margin: 15px 0;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            border-left: 4px solid #667eea;
         }
-        
-        .url-details h4 {
-            margin-top: 0;
-            color: #667eea;
+        .worker-card.running {
+            border-left-color: #51cf66;
         }
-        
-        .links-list {
-            max-height: 200px;
-            overflow-y: auto;
-            background: white;
-            padding: 15px;
-            border-radius: 8px;
-            border: 1px solid #e9ecef;
-        }
-        
-        .links-list a {
-            display: block;
-            padding: 5px 0;
-            color: #667eea;
-            text-decoration: none;
-        }
-        
-        .links-list a:hover {
-            text-decoration: underline;
-        }
-        
-        @media (max-width: 768px) {
-            .container { padding: 10px; }
-            .header h1 { font-size: 2em; }
-            .nav-tabs { flex-direction: column; }
-            .nav-tabs a { margin: 2px 0; }
-            .queue-metrics { grid-template-columns: repeat(2, 1fr); }
-            .stats-grid { grid-template-columns: 1fr; }
-            .queue-actions { flex-direction: column; }
-            .modal-content { width: 95%; margin: 10% auto; }
+        .worker-card.stopped {
+            border-left-color: #ff6b6b;
         }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="header">
-            <h1>🚀 Advanced Web Crawler</h1>
-            <p>Interactive Dashboard for Unlimited Single-Threaded Crawling</p>
+            <h1>🕷️ Queue-Based Web Crawler</h1>
+            <p>Add URLs to queue • Workers process automatically • 24-hour visit tracking</p>
         </div>
         
-        <div class="single-thread-info">
-            <h3>🚀 Unlimited Crawling - Single Thread</h3>
-            <p><strong>No Limits:</strong> This crawler will discover and crawl ALL pages on the website without depth or page restrictions.</p>
-            <p><strong>Single Thread:</strong> Simple, reliable crawling with one thread processing URLs sequentially.</p>
-            <p><strong>Smart Discovery:</strong> Automatically finds and queues new URLs as they're discovered during crawling.</p>
-        </div>
+        {% if message %}
+            <div class="results">
+                <div class="{{ 'success' if success else 'error' }}">{{ message }}</div>
+            </div>
+        {% endif %}
         
         <div class="nav-tabs">
-            <a href="#crawl" class="active" onclick="showTab('crawl', event)">Crawl Website</a>
-            <a href="#queue" onclick="showTab('queue', event)">Queue Status</a>
-            <a href="#data" onclick="showTab('data', event)">View Saved Data</a>
-            <a href="#history" onclick="showTab('history', event)">URL History</a>
+            <a href="#queue" class="active" onclick="showTab('queue', event)">Add to Queue</a>
+            <a href="#status" onclick="showTab('status', event)">Queue Status</a>
+            <a href="#workers" onclick="showTab('workers', event)">Workers</a>
+            <a href="#data" onclick="showTab('data', event)">View Data</a>
         </div>
         
-        <div id="crawl-tab" style="display: none;">
-            <div class="crawl-settings">
-                <h3>🚀 Start New Crawl</h3>
+        <div id="queue-tab" style="display: block;">
+            <div class="queue-settings">
+                <h3>📝 Add URL to Queue</h3>
                 <div class="form-group">
                     <label for="url">Website URL:</label>
                     <input name="url" id="url" type="text" placeholder="https://example.com" value="{{ url or '' }}" required>
                 </div>
-                <div class="single-thread-info">
-                    <strong>Single-Threaded Crawling:</strong><br>
-                    • <strong>Simple & Reliable:</strong> One thread processes URLs sequentially<br>
-                    • <strong>No Configuration:</strong> No thread count to worry about<br>
-                    • <strong>Respectful:</strong> 0.5 second delay between requests<br>
-                    • <strong>Unlimited:</strong> No depth or page restrictions
+                <div class="form-group">
+                    <label for="priority">Priority:</label>
+                    <select id="priority" style="padding: 12px 15px; font-size: 16px; border: 2px solid #e1e5e9; border-radius: 8px;">
+                        <option value="0">Normal</option>
+                        <option value="1">High</option>
+                        <option value="-1">Low</option>
+                    </select>
+                </div>
+                <div class="24h-rule-info">
+                    <h3>🕐 24-Hour Rule</h3>
+                    <p><strong>Smart Queueing:</strong> URLs are only added to queue if not visited in the last 24 hours</p>
+                    <p><strong>Automatic Processing:</strong> Workers continuously process queued URLs</p>
+                    <p><strong>No Duplicates:</strong> Same URL won't be queued multiple times</p>
                 </div>
                 <div class="form-group">
-                    <button type="button" id="start-crawl-btn" onclick="startCrawl()" {% if crawling_in_progress %}disabled{% endif %}>
-                        {% if crawling_in_progress %}
-                            <span class="loading"></span> Crawling in Progress...
-                        {% else %}
-                            🚀 Start Unlimited Crawling
-                        {% endif %}
-                    </button>
-                    <button type="button" id="stop-crawl-btn" onclick="stopCrawl()" class="btn-danger" style="display: none;">
-                        ⏹️ Stop Crawl
+                    <button type="button" id="add-url-btn" onclick="addUrlToQueue()">
+                        ➕ Add to Queue
                     </button>
                 </div>
             </div>
 
-            <div id="crawl-message"></div>
+            <div id="queue-message"></div>
         </div>
         
-        <div id="queue-tab" style="display: none;">
-            <h2>Crawler Queue Status - Single Thread</h2>
+        <div id="status-tab" style="display: none;">
+            <h2>📊 Queue Status</h2>
             
             <div class="auto-refresh">
                 <input type="checkbox" id="auto-refresh" checked>
                 <label for="auto-refresh">Auto-refresh every 2 seconds</label>
-                <button onclick="refreshQueueState()" style="margin-left: 10px;">Refresh Now</button>
-                <span id="queue-tab-indicator" style="margin-left: 10px; color: #28a745; font-weight: bold; display: none;">✓ Queue Tab Active</span>
+                <button onclick="refreshQueueStatus()" style="margin-left: 10px;">Refresh Now</button>
+                <span id="status-tab-indicator" style="margin-left: 10px; color: #28a745; font-weight: bold; display: none;">✓ Status Tab Active</span>
             </div>
             
-            <div id="queue-status-display">
-                <div class="queue-status">
-                    <p>No crawl in progress. Start a new crawl to see queue status.</p>
+            <div id="queue-stats-display" class="stats-grid">
+                <div class="stat-card">
+                    <h4>📈 Queue Statistics</h4>
+                    <p><strong>Completed URLs:</strong> <span id="completed-urls">-</span></p>
+                    <p><strong>Failed URLs:</strong> <span id="failed-urls">-</span></p>
                 </div>
+                <div class="stat-card">
+                    <h4>📊 Content Database</h4>
+                    <p><strong>Total Records:</strong> <span id="content-records">-</span></p>
+                    <p><strong>Total Visits:</strong> <span id="total-visits">-</span></p>
+                </div>
+                <div class="stat-card">
+                    <h4>🗃️ Redis Queue Status</h4>
+                    <p><strong>Pending in Redis:</strong> <span id="redis-queue-length">{{ redis_queue_length }}</span></p>
+                    <p><strong>Visited (24h):</strong> <span id="redis-visited-count">{{ redis_visited_count }}</span></p>
+                </div>
+            </div>
+            <div style="margin: 30px 0;">
+                <h4>📈 Queue Size Trend (Last 24h)</h4>
+                <canvas id="queueTrendChart" height="80"></canvas>
+            </div>
+            <div id="pending-urls-display">
+                <h3>⏳ Pending URLs</h3>
+                <div id="pending-urls-table"></div>
+            </div>
+            
+            <div class="queue-actions">
+                <button onclick="clearQueue()" class="btn-danger">🗑️ Clear Queue</button>
+                <button onclick="startWorkers()" class="btn-success">▶️ Start Workers</button>
+                <button onclick="stopWorkers()" class="btn-warning">⏹️ Stop Workers</button>
+            </div>
+        </div>
+        
+        <div id="workers-tab" style="display: none;">
+            <h2>🔧 Worker Management</h2>
+            
+            <div class="worker-info">
+                <strong>Worker System:</strong><br>
+                • <strong>Background Processing:</strong> Workers run continuously in background<br>
+                • <strong>Automatic Queue Processing:</strong> Workers pick up URLs automatically<br>
+                • <strong>Scalable:</strong> Add/remove workers as needed<br>
+                • <strong>Fault Tolerant:</strong> Failed URLs are marked and tracked
+            </div>
+            
+            <div id="worker-stats-display" class="stats-grid">
+                <div class="stat-card">
+                    <h4>👥 Worker Status</h4>
+                    <p><strong>Total Workers:</strong> <span id="total-workers">-</span></p>
+                    <p><strong>Running Workers:</strong> <span id="running-workers">-</span></p>
+                    <p><strong>System Status:</strong> <span id="system-status">-</span></p>
+                </div>
+            </div>
+            
+            <div id="worker-details-display" class="worker-grid">
+                <!-- Worker details will be populated here -->
+            </div>
+            
+            <div class="queue-actions">
+                <button onclick="addWorker()" class="btn-success">➕ Add Worker</button>
+                <button onclick="startWorkers()" class="btn-success">▶️ Start All Workers</button>
+                <button onclick="stopWorkers()" class="btn-warning">⏹️ Stop All Workers</button>
             </div>
         </div>
         
         <div id="data-tab" style="display: none;">
-            <h2>📊 Saved Crawled Data</h2>
+            <h2>📊 Crawled Data</h2>
             
             <div class="search-box">
                 <input type="search" id="data-search" placeholder="Search URLs or titles..." onkeyup="searchData()">
@@ -598,358 +594,411 @@ HTML_TEMPLATE = """
                                 <th>URL</th>
                                 <th>Title</th>
                                 <th>Content Preview</th>
-                                <th>HTML Content</th>
-                                <th>Links Count</th>
-                                <th>Depth</th>
+                                <th>Status</th>
+                                <th>Response Time</th>
                                 <th>Crawled At</th>
                                 <th>Actions</th>
                             </tr>
                         </thead>
                         <tbody id="data-tbody">
-                        {% for row in crawled_data %}
+                        {% for item in crawled_data %}
                             <tr>
-                                <td><a href="{{ row[0] }}" target="_blank">{{ row[0] }}</a></td>
-                                <td>{{ row[1] or 'No title' }}</td>
-                                <td class="content-preview">{{ row[2][:100] }}{% if row[2]|length > 100 %}...{% endif %}</td>
+                                <td><a href="{{ item.url }}" target="_blank">{{ item.url }}</a></td>
+                                <td>{{ item.title or 'No title' }}</td>
+                                <td class="content-preview">{{ item.content[:100] }}{% if item.content|length > 100 %}...{% endif %}</td>
                                 <td>
-                                    {% if row[3] %}
-                                        <a href="/html/{{ row[0] | urlencode }}" class="html-link" target="_blank">
-                                            View HTML ({{ row[3]|length }} chars)
-                                        </a>
-                                    {% else %}
-                                        <span style="color: #999;">No HTML</span>
-                                    {% endif %}
+                                    <span class="status-{{ 'completed' if item.status_code == 200 else 'failed' }}">
+                                        {{ item.status_code or 'Unknown' }}
+                                    </span>
                                 </td>
-                                <td>{{ row[4].count('\\n') + 1 if row[4] else 0 }}</td>
-                                <td>{{ row[6] or 0 }}</td>
-                                <td>{{ row[5] }}</td>
+                                <td>{{ "%.2f"|format(item.response_time or 0) }}s</td>
+                                <td>{{ item.crawled_at }}</td>
                                 <td>
-                                    <button onclick="viewUrlDetails('{{ row[0] }}')" style="padding: 5px 10px; font-size: 12px;">
-                                        📋 Details
-                                    </button>
+                                    <a href="/html/{{ item.url | urlencode }}" class="html-link" target="_blank">
+                                        View HTML
+                                    </a>
                                 </td>
                             </tr>
                         {% endfor %}
                         </tbody>
                     </table>
-                    
-                    <div class="pagination" id="data-pagination">
-                        <button onclick="changePage(-1)" id="prev-page">← Previous</button>
-                        <span id="page-info">Page 1 of 1</span>
-                        <button onclick="changePage(1)" id="next-page">Next →</button>
-                    </div>
                 {% else %}
-                    <p>No data has been crawled yet.</p>
+                    <p>No data has been crawled yet. Add URLs to the queue to start crawling.</p>
                 {% endif %}
             </div>
         </div>
-        
-        <div id="history-tab" style="display: none;">
-            <h2>URL History & Statistics</h2>
-            {% if url_stats %}
-                <div class="stats-grid">
-                    <div class="stat-card">
-                        <h4>Overall Statistics</h4>
-                        <p><strong>Total URLs:</strong> {{ url_stats.total_urls }}</p>
-                        <p><strong>Total Domains:</strong> {{ url_stats.total_domains }}</p>
-                        <p><strong>Total Visits:</strong> {{ url_stats.total_visits }}</p>
-                        <p><strong>Avg Response Time:</strong> {{ "%.2f"|format(url_stats.avg_response_time or 0) }}s</p>
-                    </div>
-                    <div class="stat-card">
-                        <h4>Time Range</h4>
-                        <p><strong>Earliest Visit:</strong> {{ url_stats.earliest_visit or 'N/A' }}</p>
-                        <p><strong>Latest Visit:</strong> {{ url_stats.latest_visit or 'N/A' }}</p>
-                    </div>
-                </div>
-            {% endif %}
-            
-            {% if recent_urls %}
-                <h3>Recently Visited URLs (Last 24 Hours)</h3>
-                <table class="data-table">
-                    <thead>
-                        <tr>
-                            <th>URL</th>
-                            <th>Domain</th>
-                            <th>Visit Count</th>
-                            <th>Depth</th>
-                            <th>Last Visited</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                    {% for url_info in recent_urls %}
-                        <tr>
-                            <td><a href="{{ url_info.url }}" target="_blank">{{ url_info.url }}</a></td>
-                            <td>{{ url_info.domain }}</td>
-                            <td>{{ url_info.visit_count }}</td>
-                            <td>{{ url_info.crawl_depth }}</td>
-                            <td>{{ url_info.last_visited }}</td>
-                        </tr>
-                    {% endfor %}
-                    </tbody>
-                </table>
-            {% else %}
-                <p>No URLs visited in the last 24 hours.</p>
-            {% endif %}
-            
-            {% if most_visited %}
-                <h3>Most Frequently Visited URLs</h3>
-                <table class="data-table">
-                    <thead>
-                        <tr>
-                            <th>URL</th>
-                            <th>Domain</th>
-                            <th>Visit Count</th>
-                            <th>Last Visited</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                    {% for url_info in most_visited %}
-                        <tr>
-                            <td><a href="{{ url_info.url }}" target="_blank">{{ url_info.url }}</a></td>
-                            <td>{{ url_info.domain }}</td>
-                            <td>{{ url_info.visit_count }}</td>
-                            <td>{{ url_info.last_visited }}</td>
-                        </tr>
-                    {% endfor %}
-                    </tbody>
-                </table>
-            {% else %}
-                <p>No URL history available.</p>
-            {% endif %}
-        </div>
     </div>
-    
-    <!-- URL Details Modal -->
-    <div id="url-modal" class="modal">
-        <div class="modal-content">
-            <span class="close" onclick="closeModal()">&times;</span>
-            <div id="modal-content">
-                <h2>URL Details</h2>
-                <div id="url-details-content">
-                    <div class="loading"></div> Loading...
-                </div>
-            </div>
-        </div>
-    </div>
-    
+
     <script>
-        let refreshInterval;
+        let autoRefreshInterval;
         let currentPage = 1;
         let totalPages = 1;
         let currentSearch = '';
-        
+
         function showTab(tabName, event) {
-            console.log('showTab called with:', tabName, event);
+            event.preventDefault();
             
             // Hide all tabs
-            const tabs = ['crawl', 'queue', 'data', 'history'];
-            tabs.forEach(tab => {
-                const element = document.getElementById(tab + '-tab');
-                if (element) {
-                    element.style.display = 'none';
-                    console.log('Hidden tab:', tab + '-tab');
-                } else {
-                    console.error('Tab element not found:', tab + '-tab');
-                }
+            document.querySelectorAll('[id$="-tab"]').forEach(tab => {
+                tab.style.display = 'none';
             });
             
-            console.log('All tabs hidden');
+            // Remove active class from all tab links
+            document.querySelectorAll('.nav-tabs a').forEach(link => {
+                link.classList.remove('active');
+            });
             
             // Show selected tab
-            const targetTab = document.getElementById(tabName + '-tab');
-            if (targetTab) {
-                targetTab.style.display = 'block';
-                console.log('Showing tab:', tabName + '-tab');
-                
-                // Force a reflow to ensure the tab is visible
-                targetTab.offsetHeight;
-            } else {
-                console.error('Tab not found:', tabName + '-tab');
-                return;
-            }
+            document.getElementById(tabName + '-tab').style.display = 'block';
             
-            // Update active tab styling - FIXED VERSION
-            const navTabs = document.querySelectorAll('.nav-tabs a');
-            navTabs.forEach(a => {
-                a.classList.remove('active');
-                console.log('Removed active class from:', a.textContent);
-            });
+            // Add active class to clicked link
+            event.target.classList.add('active');
             
-            // Find and activate the correct tab
-            const activeTab = document.querySelector(`.nav-tabs a[href="#${tabName}"]`);
-            if (activeTab) {
-                activeTab.classList.add('active');
-                console.log('Added active class to:', activeTab.textContent);
-            } else {
-                console.error('Could not find tab link for:', tabName);
-            }
-            
-            // Start/stop auto-refresh based on tab
-            if (tabName === 'queue') {
-                console.log('Queue tab selected, starting auto-refresh...');
+            // Handle tab-specific actions
+            if (tabName === 'status') {
                 startAutoRefresh();
-                // Show queue tab indicator
-                const indicator = document.getElementById('queue-tab-indicator');
-                if (indicator) {
-                    indicator.style.display = 'inline';
-                    console.log('Queue tab indicator shown');
-                }
-                // Immediately refresh queue state when switching to queue tab
                 setTimeout(() => {
-                    refreshQueueState();
+                    refreshQueueStatus();
+                }, 100);
+            } else if (tabName === 'workers') {
+                startAutoRefresh();
+                setTimeout(() => {
+                    refreshWorkerStatus();
+                }, 100);
+            } else if (tabName === 'data') {
+                stopAutoRefresh();
+                setTimeout(() => {
+                    loadData();
                 }, 100);
             } else {
-                console.log('Non-queue tab selected, stopping auto-refresh...');
                 stopAutoRefresh();
-                // Hide queue tab indicator
-                const indicator = document.getElementById('queue-tab-indicator');
-                if (indicator) {
-                    indicator.style.display = 'none';
-                    console.log('Queue tab indicator hidden');
-                }
             }
-            
-            // Additional debugging
-            console.log('Tab switching completed. Current active tab:', tabName);
         }
-        
-        function initializeTabs() {
-            console.log('Initializing tabs...');
-            
-            // Hide all tabs first
-            const tabs = ['crawl', 'queue', 'data', 'history'];
-            tabs.forEach(tab => {
-                const element = document.getElementById(tab + '-tab');
-                if (element) {
-                    element.style.display = 'none';
-                    console.log('Initialized tab as hidden:', tab + '-tab');
-                } else {
-                    console.error('Tab element not found during init:', tab + '-tab');
-                }
-            });
-            
-            // Check if there's data available and show data tab by default
-            const totalPages = document.getElementById('total-pages');
-            const hasData = totalPages && parseInt(totalPages.textContent) > 0;
-            
-            if (hasData) {
-                // Show data tab by default if there's data
-                const dataTab = document.getElementById('data-tab');
-                if (dataTab) {
-                    dataTab.style.display = 'block';
-                    console.log('Showing data tab by default (data available)');
-                }
-                
-                // Set the data tab as active
-                const dataTabLink = document.querySelector('.nav-tabs a[href="#data"]');
-                if (dataTabLink) {
-                    dataTabLink.classList.add('active');
-                    console.log('Set data tab as active');
-                }
-            } else {
-                // Show crawl tab by default if no data
-                const crawlTab = document.getElementById('crawl-tab');
-                if (crawlTab) {
-                    crawlTab.style.display = 'block';
-                    console.log('Showing crawl tab by default (no data)');
-                }
-                
-                // Set the first tab (Crawl Website) as active
-                const firstTab = document.querySelector('.nav-tabs a[href="#crawl"]');
-                if (firstTab) {
-                    firstTab.classList.add('active');
-                    console.log('Set crawl tab as active');
-                }
-            }
-            
-            // Always refresh queue state on page load to show current status
-            setTimeout(() => {
-                refreshQueueState();
-                // If there's an active crawl, start auto-refresh
-                fetch('/api/queue-state')
-                    .then(response => response.json())
-                    .then(data => {
-                        if (data.success && data.data && (data.data.total_urls > 0 || data.data.completed_urls > 0)) {
-                            // There's an active crawl, start auto-refresh
-                            if (document.getElementById('auto-refresh').checked) {
-                                startAutoRefresh();
-                            }
-                        }
-                    })
-                    .catch(error => console.error('Error checking queue state on init:', error));
-            }, 500);
-            
-            console.log('Tab initialization completed');
-        }
-        
-        function startCrawl() {
+
+        function addUrlToQueue() {
             const url = document.getElementById('url').value.trim();
+            const priority = document.getElementById('priority').value;
+            
             if (!url) {
                 showMessage('Please enter a URL', 'error');
                 return;
             }
             
-            const startBtn = document.getElementById('start-crawl-btn');
-            const stopBtn = document.getElementById('stop-crawl-btn');
+            const addBtn = document.getElementById('add-url-btn');
+            addBtn.disabled = true;
+            addBtn.innerHTML = '<span class="loading"></span> Adding...';
             
-            startBtn.disabled = true;
-            startBtn.innerHTML = '<span class="loading"></span> Starting...';
-            
-            fetch('/api/start-crawl', {
+            fetch('/api/add-url', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({ url: url })
+                body: JSON.stringify({ url: url, priority: parseInt(priority) })
             })
             .then(response => response.json())
             .then(data => {
                 if (data.success) {
                     showMessage(data.message, 'success');
-                    startBtn.style.display = 'none';
-                    stopBtn.style.display = 'inline-block';
-                    startAutoRefresh();
+                    document.getElementById('url').value = '';
                 } else {
-                    showMessage(data.message, 'error');
-                    startBtn.disabled = false;
-                    startBtn.innerHTML = '🚀 Start Unlimited Crawling';
+                    showMessage(data.error || 'Error adding URL to queue', 'error');
                 }
             })
             .catch(error => {
-                console.error('Error starting crawl:', error);
-                showMessage('Error starting crawl', 'error');
-                startBtn.disabled = false;
-                startBtn.innerHTML = '🚀 Start Unlimited Crawling';
+                console.error('Error adding URL to queue:', error);
+                showMessage('Error adding URL to queue', 'error');
+            })
+            .finally(() => {
+                addBtn.disabled = false;
+                addBtn.innerHTML = '➕ Add to Queue';
             });
         }
-        
+
         function showMessage(message, type) {
-            const messageDiv = document.getElementById('crawl-message');
+            const messageDiv = document.getElementById('queue-message');
             messageDiv.innerHTML = `<div class="${type}">${message}</div>`;
             setTimeout(() => {
                 messageDiv.innerHTML = '';
             }, 5000);
         }
-        
+
+        function refreshQueueStatus() {
+            fetch('/api/queue-stats')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        updateQueueStats(data.data);
+                    }
+                })
+                .catch(error => console.error('Error refreshing queue status:', error));
+            
+            fetch('/api/database-stats')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        updateDatabaseStats(data.data);
+                    }
+                })
+                .catch(error => console.error('Error refreshing database stats:', error));
+            
+            fetch('/api/pending-urls')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        updatePendingUrls(data.data);
+                    }
+                })
+                .catch(error => console.error('Error fetching pending URLs:', error));
+        }
+
+        function updateQueueStats(stats) {
+            document.getElementById('completed-urls').textContent = stats.completed_urls || 0;
+            document.getElementById('failed-urls').textContent = stats.failed_urls || 0;
+        }
+
+        function updateDatabaseStats(stats) {
+            document.getElementById('content-records').textContent = stats.content_records || 0;
+            document.getElementById('total-visits').textContent = stats.total_visits || 0;
+        }
+
+        function updatePendingUrls(urls) {
+            const container = document.getElementById('pending-urls-table');
+            if (urls.length === 0) {
+                container.innerHTML = '<p>No pending URLs in queue.</p>';
+                return;
+            }
+            
+            const table = `
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>URL</th>
+                            <th>Domain</th>
+                            <th>Priority</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${urls.map(urlString => {
+                            try {
+                                const url = new URL(urlString);
+                                const domain = url.hostname;
+                                return `
+                                    <tr>
+                                        <td><a href="${urlString}" target="_blank">${urlString}</a></td>
+                                        <td>${domain}</td>
+                                        <td>
+                                            <span class="priority-medium">Normal</span>
+                                        </td>
+                                    </tr>
+                                `;
+                            } catch (e) {
+                                return `
+                                    <tr>
+                                        <td><a href="${urlString}" target="_blank">${urlString}</a></td>
+                                        <td>Invalid URL</td>
+                                        <td>
+                                            <span class="priority-medium">Normal</span>
+                                        </td>
+                                    </tr>
+                                `;
+                            }
+                        }).join('')}
+                    </tbody>
+                </table>
+            `;
+            container.innerHTML = table;
+        }
+
+        function refreshWorkerStatus() {
+            fetch('/api/worker-stats', { 
+                method: 'GET',
+                signal: AbortSignal.timeout(5000) // 5 second timeout
+            })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        updateWorkerStats(data.data);
+                    } else {
+                        console.error('Worker stats API error:', data.error);
+                        // Try fallback to health endpoint
+                        refreshWorkerStatusFallback();
+                    }
+                })
+                .catch(error => {
+                    console.error('Error refreshing worker status:', error);
+                    // Try fallback to health endpoint
+                    refreshWorkerStatusFallback();
+                });
+        }
+
+        function refreshWorkerStatusFallback() {
+            // Fallback to health endpoint for basic worker status
+            fetch('/api/health', { 
+                method: 'GET',
+                signal: AbortSignal.timeout(3000) // 3 second timeout
+            })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.workers_running !== undefined) {
+                        document.getElementById('total-workers').textContent = '2'; // Default worker count
+                        document.getElementById('running-workers').textContent = data.workers_running ? '2' : '0';
+                        document.getElementById('system-status').textContent = data.workers_running ? 'Running' : 'Stopped';
+                        
+                        // Show basic worker info
+                        const container = document.getElementById('worker-details-display');
+                        container.innerHTML = `
+                            <div class="worker-card ${data.workers_running ? 'running' : 'stopped'}">
+                                <h4>Worker Status (Basic)</h4>
+                                <p><strong>Status:</strong> ${data.workers_running ? '🟢 Running' : '🔴 Stopped'}</p>
+                                <p><strong>Note:</strong> Detailed stats unavailable due to database lock</p>
+                                <p><strong>Queue:</strong> ${data.queue_stats ? data.queue_stats.completed_urls : 'Unknown'} completed URLs</p>
+                            </div>
+                        `;
+                    }
+                })
+                .catch(error => {
+                    console.error('Error with fallback worker status:', error);
+                    // Show error in UI
+                    document.getElementById('total-workers').textContent = 'Error';
+                    document.getElementById('running-workers').textContent = 'Error';
+                    document.getElementById('system-status').textContent = 'Error';
+                });
+        }
+
+        function updateWorkerStats(stats) {
+            document.getElementById('total-workers').textContent = stats.total_workers || 0;
+            document.getElementById('running-workers').textContent = Object.values(stats.workers || {}).filter(w => w.running).length;
+            document.getElementById('system-status').textContent = stats.running ? 'Running' : 'Stopped';
+            
+            const container = document.getElementById('worker-details-display');
+            const workerCards = Object.entries(stats.workers || {}).map(([id, worker]) => {
+                const startedAt = worker.started_at ? new Date(parseFloat(worker.started_at) * 1000).toLocaleString() : 'N/A';
+                return `
+                <div class="worker-card ${worker.running ? 'running' : 'stopped'}">
+                    <h4>Worker ${id}</h4>
+                    <p><strong>Status:</strong> ${worker.running ? '🟢 Running' : '🔴 Stopped'}</p>
+                    <p><strong>Processed URLs:</strong> ${worker.processed_urls || 0}</p>
+                    <p><strong>Failed URLs:</strong> ${worker.failed_urls || 0}</p>
+                    <p><strong>Total URLs:</strong> ${worker.total_urls || 0}</p>
+                    <p><strong>Started At:</strong> ${startedAt}</p>
+                    <p><strong>Thread Alive:</strong> ${worker.thread_alive ? 'Yes' : 'No'}</p>
+                </div>
+            `}).join('');
+            
+            container.innerHTML = workerCards;
+        }
+
+        function startAutoRefresh() {
+            if (autoRefreshInterval) {
+                clearInterval(autoRefreshInterval);
+            }
+            autoRefreshInterval = setInterval(() => {
+                if (document.getElementById('auto-refresh').checked) {
+                    // Check which tab is active and refresh accordingly
+                    if (document.getElementById('status-tab').style.display !== 'none') {
+                        refreshQueueStatus();
+                    } else if (document.getElementById('workers-tab').style.display !== 'none') {
+                        refreshWorkerStatus();
+                    }
+                }
+            }, 2000);
+        }
+
+        function stopAutoRefresh() {
+            if (autoRefreshInterval) {
+                clearInterval(autoRefreshInterval);
+                autoRefreshInterval = null;
+            }
+        }
+
+        function clearQueue() {
+            if (confirm('Are you sure you want to clear the queue? This will remove all pending URLs.')) {
+                fetch('/api/clear-queue', { method: 'POST' })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            showMessage('Queue cleared successfully', 'success');
+                            refreshQueueStatus();
+                        } else {
+                            showMessage(data.error || 'Error clearing queue', 'error');
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error clearing queue:', error);
+                        showMessage('Error clearing queue', 'error');
+                    });
+            }
+        }
+
+        function startWorkers() {
+            fetch('/api/start-workers', { method: 'POST' })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        showMessage('Workers started successfully', 'success');
+                        refreshWorkerStatus();
+                    } else {
+                        showMessage(data.error || 'Error starting workers', 'error');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error starting workers:', error);
+                    showMessage('Error starting workers', 'error');
+                });
+        }
+
+        function stopWorkers() {
+            fetch('/api/stop-workers', { method: 'POST' })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        showMessage('Workers stopped successfully', 'success');
+                        refreshWorkerStatus();
+                    } else {
+                        showMessage(data.error || 'Error stopping workers', 'error');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error stopping workers:', error);
+                    showMessage('Error stopping workers', 'error');
+                });
+        }
+
+        function addWorker() {
+            fetch('/api/add-worker', { method: 'POST' })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        showMessage('Worker added successfully', 'success');
+                        refreshWorkerStatus();
+                    } else {
+                        showMessage(data.error || 'Error adding worker', 'error');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error adding worker:', error);
+                    showMessage('Error adding worker', 'error');
+                });
+        }
+
         function searchData() {
             const searchTerm = document.getElementById('data-search').value.trim();
             currentSearch = searchTerm;
             currentPage = 1;
             loadData();
         }
-        
+
         function clearSearch() {
             document.getElementById('data-search').value = '';
             currentSearch = '';
             currentPage = 1;
             loadData();
         }
-        
+
         function loadData() {
             const params = new URLSearchParams({
-                page: currentPage,
-                per_page: 20,
-                search: currentSearch
+                limit: 50,
+                offset: (currentPage - 1) * 50
             });
             
             fetch(`/api/crawled-data?${params}`)
@@ -961,276 +1010,95 @@ HTML_TEMPLATE = """
                 })
                 .catch(error => console.error('Error loading data:', error));
         }
-        
+
         function updateDataTable(data) {
             const tbody = document.getElementById('data-tbody');
-            const totalPagesSpan = document.getElementById('total-pages');
-            const pageInfo = document.getElementById('page-info');
             
-            totalPagesSpan.textContent = data.total;
-            currentPage = data.page;
-            totalPages = data.total_pages;
-            pageInfo.textContent = `Page ${currentPage} of ${totalPages}`;
+            if (data.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="8">No data available</td></tr>';
+                return;
+            }
             
-            tbody.innerHTML = data.items.map(row => `
+            tbody.innerHTML = data.map(item => `
                 <tr>
-                    <td><a href="${row[0]}" target="_blank">${row[0]}</a></td>
-                    <td>${row[1] || 'No title'}</td>
-                    <td class="content-preview">${row[2] ? (row[2].substring(0, 100) + (row[2].length > 100 ? '...' : '')) : ''}</td>
+                    <td><a href="${item.url}" target="_blank">${item.url}</a></td>
+                    <td>${item.title || 'No title'}</td>
+                    <td class="content-preview">${item.content ? (item.content.substring(0, 100) + (item.content.length > 100 ? '...' : '')) : ''}</td>
                     <td>
-                        ${row[3] ? 
-                            `<a href="/html/${encodeURIComponent(row[0])}" class="html-link" target="_blank">View HTML (${row[3].length} chars)</a>` :
-                            '<span style="color: #999;">No HTML</span>'
-                        }
+                        <span class="status-${item.status_code === 200 ? 'completed' : 'failed'}">
+                            ${item.status_code || 'Unknown'}
+                        </span>
                     </td>
-                    <td>${row[4] ? (row[4].split('\\n').length) : 0}</td>
-                    <td>${row[6] || 0}</td>
-                    <td>${row[5]}</td>
+                    <td>${item.response_time ? item.response_time.toFixed(2) : '0.00'}s</td>
+                    <td>${item.crawled_at}</td>
                     <td>
-                        <button onclick="viewUrlDetails('${row[0]}')" style="padding: 5px 10px; font-size: 12px;">
-                            📋 Details
-                        </button>
+                        <a href="/html/${encodeURIComponent(item.url)}" class="html-link" target="_blank">
+                            View HTML
+                        </a>
                     </td>
                 </tr>
             `).join('');
-            
-            // Update pagination buttons
-            document.getElementById('prev-page').disabled = currentPage <= 1;
-            document.getElementById('next-page').disabled = currentPage >= totalPages;
         }
-        
-        function changePage(delta) {
-            const newPage = currentPage + delta;
-            if (newPage >= 1 && newPage <= totalPages) {
-                currentPage = newPage;
-                loadData();
-            }
-        }
-        
-        function viewUrlDetails(url) {
-            const modal = document.getElementById('url-modal');
-            const content = document.getElementById('url-details-content');
-            
-            modal.style.display = 'block';
-            content.innerHTML = '<div class="loading"></div> Loading...';
-            
-            fetch(`/api/url-details?url=${encodeURIComponent(url)}`)
+
+        function updateRedisQueueStats() {
+            fetch('/queue/redis-status')
                 .then(response => response.json())
                 .then(data => {
-                    if (data.success) {
-                        const urlData = data.data;
-                        content.innerHTML = `
-                            <div class="url-details">
-                                <h4>URL Information</h4>
-                                <p><strong>URL:</strong> <a href="${urlData.url}" target="_blank">${urlData.url}</a></p>
-                                ${urlData.url_info ? `
-                                    <p><strong>Visit Count:</strong> ${urlData.url_info.visit_count || 0}</p>
-                                    <p><strong>Last Visited:</strong> ${urlData.url_info.last_visited || 'N/A'}</p>
-                                    <p><strong>Response Time:</strong> ${urlData.url_info.avg_response_time ? urlData.url_info.avg_response_time.toFixed(2) + 's' : 'N/A'}</p>
-                                ` : '<p>No URL history available</p>'}
-                            </div>
-                            
-                            ${urlData.content_data ? `
-                                <div class="url-details">
-                                    <h4>Content Information</h4>
-                                    <p><strong>Title:</strong> ${urlData.content_data.title || 'No title'}</p>
-                                    <p><strong>Crawled At:</strong> ${urlData.content_data.crawled_at}</p>
-                                    <p><strong>Crawl Depth:</strong> ${urlData.content_data.crawl_depth}</p>
-                                    <p><strong>Content Length:</strong> ${urlData.content_data.content ? urlData.content_data.content.length : 0} characters</p>
-                                    <p><strong>HTML Length:</strong> ${urlData.content_data.html_content ? urlData.content_data.html_content.length : 0} characters</p>
-                                    
-                                    <h4>Content Preview</h4>
-                                    <div style="background: white; padding: 15px; border-radius: 8px; border: 1px solid #e9ecef; max-height: 200px; overflow-y: auto;">
-                                        ${urlData.content_data.content ? urlData.content_data.content.substring(0, 500) + (urlData.content_data.content.length > 500 ? '...' : '') : 'No content available'}
-                                    </div>
-                                    
-                                    ${urlData.content_data.links && urlData.content_data.links.length > 0 ? `
-                                        <h4>Discovered Links (${urlData.content_data.links.length})</h4>
-                                        <div class="links-list">
-                                            ${urlData.content_data.links.slice(0, 20).map(link => `<a href="${link}" target="_blank">${link}</a>`).join('')}
-                                            ${urlData.content_data.links.length > 20 ? `<p><em>... and ${urlData.content_data.links.length - 20} more links</em></p>` : ''}
-                                        </div>
-                                    ` : '<p>No links discovered</p>'}
-                                </div>
-                            ` : '<p>No content data available</p>'}
-                        `;
-                    } else {
-                        content.innerHTML = `<div class="error">Error loading URL details: ${data.error}</div>`;
-                    }
-                })
-                .catch(error => {
-                    console.error('Error loading URL details:', error);
-                    content.innerHTML = '<div class="error">Error loading URL details</div>';
+                    document.getElementById('redis-queue-length').textContent = data.queue_length;
+                    document.getElementById('redis-visited-count').textContent = data.visited_count;
                 });
         }
-        
-        function closeModal() {
-            document.getElementById('url-modal').style.display = 'none';
-        }
-        
-        // Close modal when clicking outside
-        window.onclick = function(event) {
-            const modal = document.getElementById('url-modal');
-            if (event.target === modal) {
-                modal.style.display = 'none';
+
+        // Auto-refresh every 2 seconds if on status tab
+        setInterval(function() {
+            if (document.getElementById('status-tab').style.display !== 'none') {
+                updateRedisQueueStats();
             }
-        }
-        
-        function startAutoRefresh() {
-            if (document.getElementById('auto-refresh').checked) {
-                refreshInterval = setInterval(refreshQueueState, 2000);
-            }
-        }
-        
-        function stopAutoRefresh() {
-            if (refreshInterval) {
-                clearInterval(refreshInterval);
-                refreshInterval = null;
-            }
-        }
-        
-        function refreshQueueState() {
-            fetch('/api/queue-state')
-                .then(response => response.json())
+        }, 2000);
+
+        // Chart.js for queue trend
+        let queueTrendChart;
+        function loadQueueTrendChart() {
+            fetch('/queue/history')
+                .then(res => res.json())
                 .then(data => {
-                    if (data.success) {
-                        updateQueueDisplay(data.data);
-                    }
-                })
-                .catch(error => console.error('Error refreshing queue state:', error));
-        }
-        
-        function updateQueueDisplay(data) {
-            // The API returns queue state directly under 'data', not 'data.queue_state'
-            const queueState = data;
-            const crawlingInProgress = data.processing_urls > 0;
-            
-            // Update the queue status display
-            const display = document.getElementById('queue-status-display');
-            if (queueState && (queueState.total_urls > 0 || queueState.completed_urls > 0)) {
-                const progressPercent = queueState.total_urls > 0 ? 
-                    Math.round((queueState.completed_urls / queueState.total_urls) * 100 * 10) / 10 : 0;
-                
-                display.innerHTML = `
-                    <div class="queue-status ${crawlingInProgress ? 'active' : queueState.completed_urls > 0 ? 'completed' : ''}">
-                        <h3>Current Status</h3>
-                        
-                        <div class="queue-metrics">
-                            <div class="metric">
-                                <div class="metric-value">${queueState.total_urls || 0}</div>
-                                <div class="metric-label">Total URLs</div>
-                            </div>
-                            <div class="metric">
-                                <div class="metric-value">${queueState.queued_urls || 0}</div>
-                                <div class="metric-label">Queued</div>
-                            </div>
-                            <div class="metric">
-                                <div class="metric-value">${queueState.processing_urls || 0}</div>
-                                <div class="metric-label">Processing</div>
-                            </div>
-                            <div class="metric">
-                                <div class="metric-value">${queueState.completed_urls || 0}</div>
-                                <div class="metric-label">Completed</div>
-                            </div>
-                            <div class="metric">
-                                <div class="metric-value">${queueState.failed_urls || 0}</div>
-                                <div class="metric-label">Failed</div>
-                            </div>
-                        </div>
-                        
-                        ${queueState.current_url ? `
-                            <div class="current-url">
-                                <strong>Currently Processing:</strong><br>
-                                URL: ${queueState.current_url}<br>
-                                Depth: ${queueState.current_depth}
-                            </div>
-                        ` : ''}
-                        
-                        ${queueState.start_time ? `<p><strong>Started:</strong> ${queueState.start_time}</p>` : ''}
-                        
-                        ${queueState.estimated_completion ? `<p><strong>Estimated Completion:</strong> ${new Date(queueState.estimated_completion * 1000).toLocaleString()}</p>` : ''}
-                        
-                        ${queueState.completed_urls > 0 && queueState.total_urls > 0 ? `
-                            <div class="progress">
-                                <div class="progress-bar">
-                                    <div class="progress-fill" style="width: ${progressPercent}%"></div>
-                                </div>
-                                <p style="text-align: center; margin-top: 5px;">
-                                    ${queueState.completed_urls} / ${queueState.total_urls} (${progressPercent}%)
-                                </p>
-                            </div>
-                        ` : ''}
-                        
-                        ${queueState.errors && queueState.errors.length > 0 ? `
-                            <h4>Recent Errors:</h4>
-                            <ul>
-                            ${queueState.errors.slice(-5).map(error => `<li>${error}</li>`).join('')}
-                            </ul>
-                        ` : ''}
-                    </div>
-                `;
-            } else {
-                display.innerHTML = `
-                    <div class="queue-status">
-                        <p>No crawl in progress. Start a new crawl to see queue status.</p>
-                    </div>
-                `;
-            }
-        }
-        
-        function stopCrawl() {
-            if (confirm('Are you sure you want to stop the current crawl?')) {
-                fetch('/api/stop-crawl')
-                    .then(response => response.json())
-                    .then(data => {
-                        if (data.success) {
-                            alert('Crawl stop requested. It will stop after completing current URL.');
-                            const startBtn = document.getElementById('start-crawl-btn');
-                            const stopBtn = document.getElementById('stop-crawl-btn');
-                            startBtn.style.display = 'inline-block';
-                            stopBtn.style.display = 'none';
-                            startBtn.disabled = false;
-                            startBtn.innerHTML = '🚀 Start Unlimited Crawling';
-                        } else {
-                            alert(data.message);
+                    const labels = data.map(d => new Date(d.timestamp * 1000).toLocaleTimeString());
+                    const values = data.map(d => d.queue_length);
+                    const ctx = document.getElementById('queueTrendChart').getContext('2d');
+                    if (queueTrendChart) queueTrendChart.destroy();
+                    queueTrendChart = new Chart(ctx, {
+                        type: 'line',
+                        data: {
+                            labels: labels,
+                            datasets: [{ label: 'Queue Size', data: values, borderColor: '#667eea', fill: false }]
+                        },
+                        options: {
+                            responsive: true,
+                            plugins: { legend: { display: false } },
+                            scales: { x: { display: true }, y: { beginAtZero: true } }
                         }
-                    })
-                    .catch(error => console.error('Error stopping crawl:', error));
-            }
+                    });
+                });
         }
-        
-        // Auto-refresh checkbox handlers
+        // Load chart on page load and every 2 minutes
+        loadQueueTrendChart();
+        setInterval(loadQueueTrendChart, 120000);
+
+        // Initialize on page load
         document.addEventListener('DOMContentLoaded', function() {
-            console.log('DOM loaded, initializing tabs...');
-            initializeTabs();
-            
+            // Set up auto-refresh checkbox
             document.getElementById('auto-refresh').addEventListener('change', function() {
-                if (this.checked && document.getElementById('queue-tab').style.display !== 'none') {
+                if (this.checked && document.querySelector('.nav-tabs a.active').getAttribute('href') === '#status') {
                     startAutoRefresh();
                 } else {
                     stopAutoRefresh();
                 }
             });
+            
+            // Initial load
+            refreshQueueStatus();
+            refreshWorkerStatus();
         });
-        
-        // Show specific tabs if requested via URL parameters
-        {% if show_data %}
-            document.addEventListener('DOMContentLoaded', function() {
-                setTimeout(() => showTab('data', null), 100);
-            });
-        {% endif %}
-        
-        {% if show_history %}
-            document.addEventListener('DOMContentLoaded', function() {
-                setTimeout(() => showTab('history', null), 100);
-            });
-        {% endif %}
-        
-        {% if show_queue %}
-            document.addEventListener('DOMContentLoaded', function() {
-                setTimeout(() => showTab('queue', null), 100);
-            });
-        {% endif %}
     </script>
 </body>
 </html>

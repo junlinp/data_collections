@@ -6,11 +6,12 @@ A comprehensive web crawling and AI summarization system with a modern web UI. T
 2. **Web UI** - Modern interface for managing crawls and viewing results
 3. **LLM Processor** - Processes crawled content using local LLM models
 4. **Summary Display Server** - Web interface for viewing AI-generated summaries
+5. **Redis **
 
 ## Features
 
 - **Web Crawling**: Crawl websites with configurable depth and rate limiting
-- **Content Storage**: Persistent SQLite database storage
+- **Content Storage**: Persistent MongoDB database storage
 - **AI Summarization**: Generate structured summaries using local LLM models
 - **Modern UI**: Clean, responsive web interface
 - **Health Monitoring**: Built-in health checks for all services
@@ -71,15 +72,36 @@ Ensure you have Docker and Docker Compose installed on your system.
 
 ## Service Architecture
 
-### 1. Web Crawler Server (Port 5001)
+### 1. MongoDB Database (Port 27017)
 
-**Purpose**: Crawls websites and stores content in a database.
+**Purpose**: Primary database for storing web content and summaries.
+
+**Features**:
+- Document-based storage for web content and summaries
+- Automatic indexing for performance
+- Scalable and flexible schema
+- Persistent storage in `/mnt/rbd0/crawler_data/mongodb`
+
+**Collections**:
+- `web_content` - Stored crawled web pages
+- `url_history` - URL processing history
+- `summaries` - AI-generated summaries
+
+**Environment Variables**:
+- `MONGO_INITDB_ROOT_USERNAME` - Admin username (default: admin)
+- `MONGO_INITDB_ROOT_PASSWORD` - Admin password (default: password123)
+- `MONGO_INITDB_DATABASE` - Database name (default: crawler_db)
+
+### 2. Web Crawler Server (Port 5001)
+
+**Purpose**: Crawls websites and stores content in MongoDB.
 
 **Features**:
 - Configurable crawl depth and rate limiting
 - Proxy support for network access
 - URL deduplication and history tracking
 - Health monitoring
+- MongoDB integration for content storage
 
 **API Endpoints**:
 - `GET /api/health` - Health check
@@ -92,8 +114,8 @@ Ensure you have Docker and Docker Compose installed on your system.
 - `CRAWLER_PORT` - Server port (default: 5001)
 - `DEBUG` - Debug mode (default: False)
 - `HTTP_PROXY` / `HTTPS_PROXY` - Proxy settings
-- `CONTENT_DB_PATH` - Database path (default: /app/data/web_crawler.db)
-- `URL_HISTORY_DB_PATH` - URL history database path
+- `MONGODB_URI` - MongoDB connection string
+- `MONGODB_DATABASE` - MongoDB database name
 
 ### 2. Web UI (Port 5002)
 
@@ -120,6 +142,7 @@ Ensure you have Docker and Docker Compose installed on your system.
 - Key points extraction
 - Sentiment analysis
 - Fallback processing when LLM is unavailable
+- MongoDB integration for content and summary storage
 
 **API Endpoints**:
 - `GET /api/health` - Health check with LLM status
@@ -132,8 +155,8 @@ Ensure you have Docker and Docker Compose installed on your system.
 **Environment Variables**:
 - `LLM_PORT` - Server port (default: 5003)
 - `DEBUG` - Debug mode (default: False)
-- `CONTENT_DB_PATH` - Source content database path
-- `SUMMARY_DB_PATH` - Summary database path
+- `MONGODB_URI` - MongoDB connection string
+- `MONGODB_DATABASE` - MongoDB database name
 - `LOCAL_LLM_URL` - Local LLM server URL (default: http://host.docker.internal:11434)
 - `LOCAL_LLM_MODEL` - LLM model name (default: deepseek-r1:latest)
 
@@ -146,61 +169,80 @@ Ensure you have Docker and Docker Compose installed on your system.
 - Processing status monitoring
 - Pagination support
 - Direct LLM processor integration
+- MongoDB integration for summary retrieval
 
 **API Endpoints**:
 - `GET /api/health` - Health check
-- `GET /api/summaries` - Get summaries (proxied to LLM processor)
+- `GET /api/summaries` - Get summaries from MongoDB
 - `POST /api/process-all` - Trigger processing (proxied to LLM processor)
 - `GET /api/status` - Get status (proxied to LLM processor)
 
 **Environment Variables**:
 - `SUMMARY_PORT` - Server port (default: 5004)
 - `DEBUG` - Debug mode (default: False)
-- `SUMMARY_DB_PATH` - Summary database path
+- `MONGODB_URI` - MongoDB connection string
+- `MONGODB_DATABASE` - MongoDB database name
 - `LLM_PROCESSOR_URL` - LLM processor API URL
 
-## Database Schemas
+## Database Schema
 
-### Web Content Database (web_crawler.db)
+### MongoDB Collections
 
-```sql
-CREATE TABLE web_content (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    url TEXT UNIQUE NOT NULL,
-    title TEXT,
-    html_content TEXT,
-    text_content TEXT,
-    status_code INTEGER,
-    crawl_depth INTEGER,
-    parent_url TEXT,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
+The system uses MongoDB with the following collections:
 
-CREATE TABLE url_history (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    url TEXT NOT NULL,
-    status TEXT,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
+#### web_content Collection
+```javascript
+{
+  _id: ObjectId,
+  url: String (unique),
+  title: String,
+  html_content: String,
+  text_content: String,
+  status_code: Number,
+  crawl_depth: Number,
+  parent_url: String,
+  created_at: Date,
+  updated_at: Date
+}
 ```
 
-### Summary Database (summaries.db)
-
-```sql
-CREATE TABLE summaries (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    url TEXT UNIQUE NOT NULL,
-    title TEXT,
-    summary TEXT NOT NULL,
-    key_points TEXT,
-    sentiment TEXT,
-    word_count INTEGER,
-    processing_time REAL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
+#### url_history Collection
+```javascript
+{
+  _id: ObjectId,
+  url: String,
+  status: String,
+  created_at: Date
+}
 ```
+
+#### summaries Collection
+```javascript
+{
+  _id: ObjectId,
+  url: String (unique),
+  title: String,
+  summary: String,
+  key_points: String,
+  sentiment: String,
+  word_count: Number,
+  processing_time: Number,
+  created_at: Date,
+  updated_at: Date
+}
+```
+
+**Indexes**:
+- `web_content.url` (unique)
+- `web_content.created_at`
+- `web_content.crawl_depth`
+- `web_content.status_code`
+- `url_history.url`
+- `url_history.created_at`
+- `url_history.status`
+- `summaries.url` (unique)
+- `summaries.created_at`
+- `summaries.sentiment`
 
 ## Usage
 
@@ -304,12 +346,18 @@ All databases are stored in `/mnt/rbd0/crawler_data` on the host machine and mou
 1. **Data not persisting**:
    - Verify volume mounts in docker-compose.yml
    - Check host directory permissions
-   - Ensure database paths are correctly set
+   - Ensure MongoDB data directory exists and has proper permissions
 
-2. **Database corruption**:
-   - Backup data before troubleshooting
-   - Check disk space on host
-   - Verify SQLite database integrity
+2. **MongoDB connection issues**:
+   - Check MongoDB service is running: `docker-compose ps mongodb`
+   - Verify MongoDB credentials in environment variables
+   - Check MongoDB logs: `docker-compose logs mongodb`
+   - Ensure MongoDB port 27017 is accessible
+
+3. **Database performance**:
+   - Monitor MongoDB memory usage
+   - Check index usage and performance
+   - Consider MongoDB optimization settings
 
 ## Development
 

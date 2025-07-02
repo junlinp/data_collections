@@ -6,7 +6,6 @@ Separated from the web interface for better maintainability
 import requests
 from bs4 import BeautifulSoup
 from urllib.parse import urljoin, urlparse
-import sqlite3
 from datetime import datetime
 import re
 import time
@@ -15,78 +14,20 @@ from url_manager import URLManager
 import logging
 import json
 import threading
+import random
+from redis_queue_manager import RedisQueueManager
+from mongo_utils import get_mongo_manager
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-class GlobalQueue:
-    """Global queue system for managing URLs across crawler instances"""
-    
-    def __init__(self):
-        self.lock = threading.Lock()
-        self.queue = deque()
-        self.queue_urls = set()
-        self.completed_urls = 0
-        self.failed_urls = 0
-    
-    def add_url(self, url, priority=0):
-        """Add URL to global queue"""
-        with self.lock:
-            if url not in self.queue_urls:
-                self.queue.append((url, priority))
-                self.queue_urls.add(url)
-                return True
-            return False
-    
-    def get_next_url(self) -> str | None:
-        """Get next URL from queue for processing"""
-        with self.lock:
-            if len(self.queue) == 0:
-                return None
-            url, _= self.queue.popleft()
-            self.queue_urls.remove(url)
-            print(f"Getting next URL: {url}")
-            return url
-    
-    def mark_completed(self):
-        """Mark a URL as completed"""
-        with self.lock:
-            self.completed_urls += 1
-    
-    def mark_failed(self):
-        """Mark a URL as failed"""
-        with self.lock:
-            self.failed_urls += 1
-                    
-    def get_queue_state(self):
-        """Get current queue state"""
-        with self.lock:
-            return {
-                'total_urls': len(self.queue) + self.completed_urls + self.failed_urls,
-                'queued_urls': len(self.queue),
-                'processing_urls': 0,
-                'completed_urls': self.completed_urls,
-                'failed_urls': self.failed_urls
-            }
-                
-    def clear_queue(self):
-        """Clear queue"""
-        with self.lock:
-            self.queue = deque()
-            self.queue_urls = set()
-            self.completed_urls = 0
-            self.failed_urls = 0
-                
- 
-# Global queue instance
-global_queue = GlobalQueue()
-
 class WebCrawler:
-    def __init__(self, content_db_path='web_crawler.db', url_history_db_path='url_history.db'):
-        self.content_db_path = content_db_path
-        self.url_manager = URLManager(url_history_db_path)
-        self.global_queue = global_queue
+    def __init__(self):
+        # Initialize MongoDB manager
+        self.mongo_manager = get_mongo_manager()
+        self.url_manager = URLManager()  # URLManager will be updated to use MongoDB
+        self.global_queue = RedisQueueManager(host='redis', port=6379)
         
         # Create a session for better cookie handling and authenticity
         self.session = requests.Session()
@@ -113,7 +54,6 @@ class WebCrawler:
         
         # Add more realistic browser behavior
         self.session.verify = True
-        self.session.allow_redirects = True
         
         self.init_content_db()
         
@@ -178,73 +118,101 @@ class WebCrawler:
         })
     
     def init_content_db(self):
-        """Initialize the content database"""
-        conn = sqlite3.connect(self.content_db_path)
-        cursor = conn.cursor()
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS crawled_content (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                url TEXT NOT NULL UNIQUE,
-                title TEXT,
-                content TEXT,
-                html_content TEXT,
-                links TEXT,
-                crawled_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                crawl_depth INTEGER DEFAULT 0
-            )
-        ''')
-        conn.commit()
-        conn.close()
+        """Initialize the MongoDB connection"""
+        # MongoDB connection is already initialized in constructor
+        pass
     
     def save_content_to_db(self, url, title, content, html_content, links, depth=0):
-        """Save crawled content to the content database"""
-        conn = sqlite3.connect(self.content_db_path)
-        cursor = conn.cursor()
+        """Save crawled content to MongoDB"""
         try:
-            cursor.execute('''
-                INSERT OR REPLACE INTO crawled_content (url, title, content, html_content, links, crawl_depth)
-                VALUES (?, ?, ?, ?, ?, ?)
-            ''', (url, title, content, html_content, '\n'.join(links), depth))
-            conn.commit()
-            return True
+            # Convert links to string if it's a list
+            links_str = '\n'.join(links) if isinstance(links, list) else str(links)
+            
+            success = self.mongo_manager.save_web_content(
+                url=url,
+                title=title or '',
+                html_content=html_content or '',
+                text_content=content or '',
+                status_code=200,  # Default status code
+                crawl_depth=depth or 0
+            )
+            return success
         except Exception as e:
-            logger.error(f"Error saving to database: {e}")
+            logger.error(f"Error saving to MongoDB: {e}")
             return False
-        finally:
-            conn.close()
     
     def url_exists_in_content_db(self, url):
-        """Check if URL already exists in content database"""
-        conn = sqlite3.connect(self.content_db_path)
-        cursor = conn.cursor()
-        cursor.execute('SELECT 1 FROM crawled_content WHERE url = ?', (url,))
-        exists = cursor.fetchone() is not None
-        conn.close()
-        return exists
+        """Check if URL already exists in MongoDB"""
+        try:
+            content = self.mongo_manager.get_web_content(url)
+            return content is not None
+        except Exception as e:
+            logger.error(f"Error checking URL existence in MongoDB: {e}")
+            return False
     
-    def get_crawled_content_data(self):
-        """Get all crawled content data"""
-        conn = sqlite3.connect(self.content_db_path)
-        cursor = conn.cursor()
-        cursor.execute('''
-            SELECT url, title, content, html_content, links, crawled_at, crawl_depth
-            FROM crawled_content 
-            ORDER BY crawled_at DESC
-        ''')
-        data = cursor.fetchall()
-        conn.close()
-        return data
+    def get_crawled_content_data(self, limit=None, offset=0):
+        """Get crawled content data with pagination support from MongoDB"""
+        try:
+            # Get data from MongoDB
+            docs = self.mongo_manager.get_all_web_content(limit=limit, skip=offset)
+            
+            # Convert to the expected format
+            data = []
+            for doc in docs:
+                data.append((
+                    doc.get('url', ''),
+                    doc.get('title', ''),
+                    doc.get('text_content', ''),
+                    doc.get('links', ''),
+                    doc.get('created_at', ''),
+                    doc.get('crawl_depth', 0)
+                ))
+            
+            return data
+        except Exception as e:
+            logger.error(f"Error getting crawled content data from MongoDB: {e}")
+            return []
+    
+    def get_crawled_content_with_html(self, limit=None, offset=0):
+        """Get crawled content data with html_content from MongoDB (use sparingly due to memory usage)"""
+        try:
+            # Get data from MongoDB
+            docs = self.mongo_manager.get_all_web_content(limit=limit, skip=offset)
+            
+            # Convert to the expected format
+            data = []
+            for doc in docs:
+                data.append((
+                    doc.get('url', ''),
+                    doc.get('title', ''),
+                    doc.get('text_content', ''),
+                    doc.get('html_content', ''),
+                    doc.get('links', ''),
+                    doc.get('created_at', ''),
+                    doc.get('crawl_depth', 0)
+                ))
+            
+            return data
+        except Exception as e:
+            logger.error(f"Error getting crawled content with HTML from MongoDB: {e}")
+            return []
+    
+    def get_crawled_content_count(self):
+        """Get total count of crawled content records from MongoDB"""
+        try:
+            return self.mongo_manager.count_web_content()
+        except Exception as e:
+            logger.error(f"Error getting crawled content count from MongoDB: {e}")
+            return 0
     
     def get_html_content_by_url(self, url):
-        """Get HTML content for a specific URL"""
-        conn = sqlite3.connect(self.content_db_path)
-        cursor = conn.cursor()
-        cursor.execute('''
-            SELECT html_content FROM crawled_content WHERE url = ?
-        ''', (url,))
-        result = cursor.fetchone()
-        conn.close()
-        return result[0] if result else None
+        """Get HTML content for a specific URL from MongoDB"""
+        try:
+            content = self.mongo_manager.get_web_content(url)
+            return content.get('html_content') if content else None
+        except Exception as e:
+            logger.error(f"Error getting HTML content from MongoDB: {e}")
+            return None
     
     def clean_text(self, text):
         """Clean and extract meaningful text content"""
@@ -332,10 +300,10 @@ class WebCrawler:
                     continue
                 # Normalize the URL
                 normalized_link = self.normalize_url(absolute_link)
-                # Relaxed filter: allow all links that are internal to CNN
+                # Filter links - allow all links from the same domain as base_url
                 if (not absolute_link.startswith(('javascript:', 'mailto:', '#', 'tel:', 'ftp:')) and
-                    not absolute_link.endswith(('.pdf', '.jpg', '.jpeg', '.png', '.gif', '.css', '.js')) and
-                    (absolute_link.startswith('https://edition.cnn.com') or absolute_link.startswith('/'))):
+                    not absolute_link.endswith(('.pdf', '.jpg', '.jpeg', '.png', '.gif', '.css', '.js', '.xml', '.zip', '.exe')) and
+                    self.is_same_domain(base_url, absolute_link)):
                     links.append(absolute_link)
                     discovered_urls.append(normalized_link)
             logger.info(f"[DEBUG] All <a href> found on {current_url}: {all_found}")
@@ -346,53 +314,58 @@ class WebCrawler:
             logger.error(f"Error extracting links from {current_url}: {e}")
         return links, discovered_urls
     
+    def get_random_user_agent(self):
+        user_agents = [
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+            'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15',
+            'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:124.0) Gecko/20100101 Firefox/124.0',
+            'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7; rv:124.0) Gecko/20100101 Firefox/124.0',
+        ]
+        return random.choice(user_agents)
+
+    def get_random_referer(self, base_url):
+        referers = [
+            'https://www.google.com/',
+            'https://www.bing.com/',
+            'https://duckduckgo.com/',
+            base_url,
+        ]
+        return random.choice(referers)
+
     def establish_session(self, base_url):
         """Establish a session with the target website to get cookies and appear more authentic"""
         try:
             parsed_url = urlparse(base_url)
             if parsed_url.netloc:
-                # First visit the main domain to establish session
                 main_domain = f"https://{parsed_url.netloc}"
                 logger.info(f"Establishing session with {main_domain}")
-                
-                # Clear any existing cookies for this domain
                 self.session.cookies.clear()
-                
-                # Add a more realistic referer
-                self.session.headers['Referer'] = 'https://www.google.com/'
-                
-                # First, try to visit the robots.txt to appear more like a real browser
+                self.session.headers['User-Agent'] = self.get_random_user_agent()
+                self.session.headers['Referer'] = self.get_random_referer(main_domain)
                 try:
                     robots_url = f"{main_domain}/robots.txt"
                     self.session.get(robots_url, timeout=5)
-                    time.sleep(0.5)
+                    time.sleep(random.uniform(0.5, 1.5))
                 except:
-                    pass  # Ignore robots.txt errors
-                
-                # Visit the main page first with a more realistic approach
+                    pass
                 response = self.session.get(main_domain, timeout=15, allow_redirects=True)
-                
                 if response.status_code == 200:
                     logger.info(f"Successfully established session with {main_domain}")
-                    
-                    # Try to visit a few more pages to establish a browsing pattern
                     try:
-                        # Visit common pages to establish session
                         common_paths = ['/', '/index.html', '/home']
-                        for path in common_paths[:1]:  # Just visit one to avoid being too aggressive
+                        for path in common_paths[:1]:
                             try:
                                 test_url = f"{main_domain}{path}"
-                                if test_url != main_domain:  # Avoid duplicate requests
+                                if test_url != main_domain:
                                     self.session.get(test_url, timeout=10)
-                                    time.sleep(1)
+                                    time.sleep(random.uniform(1, 2))
                                     break
                             except:
                                 pass
                     except:
                         pass
-                    
-                    # Small delay after establishing session
-                    time.sleep(2)
+                    time.sleep(random.uniform(1, 2))
                     return True
                 else:
                     logger.warning(f"Failed to establish session with {main_domain}: {response.status_code}")
@@ -449,7 +422,7 @@ class WebCrawler:
             if response.status_code == 403:
                 logger.warning(f"403 Forbidden - likely blocked by anti-bot protection for {url}")
                 # Try with different headers
-                self.session.headers['User-Agent'] = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36'
+                self.session.headers['User-Agent'] = self.get_random_user_agent()
                 time.sleep(2)
                 response = self.session.get(url, timeout=20, allow_redirects=True)
             
@@ -553,7 +526,7 @@ class WebCrawler:
         self.establish_session(base_url)
         
         # Add initial URL to global queue
-        self.global_queue.add_url(base_url, priority=10)
+        self.global_queue.add_url(base_url)
         logger.info(f"Starting single-threaded crawl of {base_url} using global queue")
         crawled_count = 0
         while not self.queue_state['stop_requested']:
@@ -572,7 +545,7 @@ class WebCrawler:
                 
                 # Add discovered URLs to global queue
                 for link in result.get('discovered_urls', []):
-                    self.global_queue.add_url(link, priority=5)
+                    self.global_queue.add_url(link)
                 
                 # Log progress periodically
                 if crawled_count % 10 == 0:
