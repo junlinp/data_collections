@@ -17,6 +17,7 @@ RUN mkdir -p /app/data
 # Copy application files
 COPY summary_display_server.py .
 COPY memory_utils.py .
+COPY mongo_utils.py .
 
 # Expose port
 EXPOSE 5004

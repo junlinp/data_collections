@@ -32,6 +32,17 @@ class WebCrawler:
         # Create a session for better cookie handling and authenticity
         self.session = requests.Session()
         
+        # Configure proxy settings from environment
+        import os
+        http_proxy = os.environ.get('HTTP_PROXY') or os.environ.get('http_proxy')
+        https_proxy = os.environ.get('HTTPS_PROXY') or os.environ.get('https_proxy')
+        if http_proxy and https_proxy:
+            self.session.proxies = {
+                'http': http_proxy,
+                'https': https_proxy
+            }
+            logger.info(f"Configured proxy: HTTP={http_proxy}, HTTPS={https_proxy}")
+        
         # Enhanced headers to better mimic a real browser
         self.session.headers.update({
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
@@ -415,7 +426,20 @@ class WebCrawler:
             # Add some request headers that change slightly to appear more human
             self.session.headers['Accept'] = 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7'
             
-            response = self.session.get(url, timeout=20, allow_redirects=True)
+            # Special handling for Baidu sites
+            if 'baidu.com' in url.lower():
+                # Add Baidu-specific headers
+                headers = {
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36',
+                    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+                    'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
+                    'Accept-Encoding': 'gzip, deflate',
+                    'Referer': 'https://www.baidu.com/',
+                    'Connection': 'keep-alive'
+                }
+                response = self.session.get(url, timeout=60, allow_redirects=True, headers=headers)
+            else:
+                response = self.session.get(url, timeout=20, allow_redirects=True)
             response_time = time.time() - start_time
             
             # Check for common anti-bot responses
@@ -424,7 +448,8 @@ class WebCrawler:
                 # Try with different headers
                 self.session.headers['User-Agent'] = self.get_random_user_agent()
                 time.sleep(2)
-                response = self.session.get(url, timeout=20, allow_redirects=True)
+                # Use longer timeout for retry
+                response = self.session.get(url, timeout=60, allow_redirects=True)
             
             response.raise_for_status()
             

@@ -57,9 +57,9 @@ services:
     deploy:
       resources:
         limits:
-          memory: 512M
+          memory: 4G
         reservations:
-          memory: 256M
+          memory: 1G
     healthcheck:
       test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:5001/api/health')"]
       interval: 30s

@@ -442,6 +442,455 @@ HTML_TEMPLATE = """
         .worker-card.stopped {
             border-left-color: #ff6b6b;
         }
+        
+        /* Enhanced Worker Timing Display Styles */
+        .timing-section {
+            margin-top: 20px;
+            padding: 20px;
+            background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+            border-radius: 15px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            border: 1px solid #dee2e6;
+        }
+        
+        .timing-header {
+            margin-bottom: 15px;
+            font-size: 1.1em;
+            font-weight: 600;
+            color: #495057;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        
+        .timing-header small {
+            color: #6c757d;
+            font-weight: 400;
+            font-size: 0.85em;
+        }
+        
+        .timing-cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+        
+        .timing-card {
+            padding: 15px;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            border-left: 4px solid #667eea;
+            transition: transform 0.2s, box-shadow 0.2s;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .timing-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.15);
+        }
+        
+        .timing-card.fetch {
+            border-left-color: #667eea;
+        }
+        
+        .timing-card.parse {
+            border-left-color: #52c41a;
+        }
+        
+        .timing-card.extract {
+            border-left-color: #fa8c16;
+        }
+        
+        .timing-card.save {
+            border-left-color: #eb2f96;
+        }
+        
+        .timing-card.add_links {
+            border-left-color: #722ed1;
+        }
+        
+        .step-name {
+            font-size: 14px;
+            font-weight: 600;
+            color: #343a40;
+            margin-bottom: 8px;
+        }
+        
+        .avg-time {
+            font-size: 18px;
+            font-weight: 700;
+            color: #667eea;
+            margin-bottom: 4px;
+        }
+        
+        .time-range {
+            font-size: 11px;
+            color: #6c757d;
+            margin-bottom: 4px;
+        }
+        
+        .process-count {
+            font-size: 11px;
+            color: #6c757d;
+            margin-bottom: 8px;
+        }
+        
+        .performance-indicator {
+            height: 4px;
+            border-radius: 2px;
+            margin-top: 8px;
+        }
+        
+        .performance-indicator.excellent {
+            background: linear-gradient(90deg, #52c41a, #73d13d);
+        }
+        
+        .performance-indicator.good {
+            background: linear-gradient(90deg, #fa8c16, #ffa940);
+        }
+        
+        .performance-indicator.needs-attention {
+            background: linear-gradient(90deg, #ff4d4f, #ff7875);
+        }
+        
+        .chart-container {
+            margin: 20px 0;
+            background: white;
+            border-radius: 10px;
+            padding: 15px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        }
+        
+        .detailed-stats {
+            margin-top: 20px;
+            background: white;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        }
+        
+        .timing-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+        }
+        
+        .timing-table th {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            padding: 12px 10px;
+            text-align: left;
+            font-weight: 600;
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .timing-table td {
+            padding: 10px;
+            border-bottom: 1px solid #f1f3f4;
+        }
+        
+        .timing-table tr:hover {
+            background: #f8f9fa;
+        }
+        
+        .time-value {
+            font-family: 'Courier New', monospace;
+            font-weight: 600;
+            color: #495057;
+        }
+        
+        .count-value {
+            font-weight: 600;
+            color: #6c757d;
+        }
+        
+        .efficiency {
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .efficiency.excellent {
+            background: linear-gradient(135deg, #52c41a, #73d13d);
+            color: white;
+        }
+        
+        .efficiency.good {
+            background: linear-gradient(135deg, #fa8c16, #ffa940);
+            color: white;
+        }
+        
+        .efficiency.warning {
+            background: linear-gradient(135deg, #ff4d4f, #ff7875);
+            color: white;
+        }
+        
+        .worker-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #e9ecef;
+        }
+        
+        .worker-status {
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        
+        .worker-status.online {
+            background: linear-gradient(135deg, #52c41a, #73d13d);
+            color: white;
+        }
+        
+        .worker-status.offline {
+            background: linear-gradient(135deg, #ff4d4f, #ff7875);
+            color: white;
+        }
+        
+        .worker-stats {
+            margin-bottom: 20px;
+        }
+        
+        .stat-group {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+        
+        .stat-item {
+            padding: 15px;
+            background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+            border-radius: 10px;
+            text-align: center;
+            border-left: 4px solid #667eea;
+        }
+        
+        .stat-label {
+            display: block;
+            font-size: 11px;
+            color: #6c757d;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 5px;
+        }
+        
+        .stat-value {
+            display: block;
+            font-size: 20px;
+            font-weight: 700;
+            color: #495057;
+        }
+        
+        .stat-value.failed {
+            color: #ff4d4f;
+        }
+        
+        .worker-details {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 10px;
+            font-size: 13px;
+        }
+        
+        .worker-details p {
+            margin: 5px 0;
+            color: #495057;
+        }
+        
+        .no-timing-data {
+            text-align: center;
+            padding: 40px;
+            background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+            border-radius: 15px;
+            color: #6c757d;
+            font-size: 16px;
+        }
+        
+        .step-icon {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+        
+        .step-icon.fetch {
+            background: #667eea;
+        }
+        
+        .step-icon.parse {
+            background: #52c41a;
+        }
+        
+        .step-icon.extract {
+            background: #fa8c16;
+        }
+        
+        .step-icon.save {
+            background: #eb2f96;
+        }
+        
+        .step-icon.add_links {
+            background: #722ed1;
+        }
+        
+        /* Recent URLs Section Styles */
+        .recent-urls-section {
+            margin-top: 25px;
+            padding: 20px;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            border: 1px solid #dee2e6;
+        }
+        
+        .section-header {
+            margin-bottom: 15px;
+            font-size: 1.1em;
+            font-weight: 600;
+            color: #495057;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        
+        .section-header small {
+            color: #6c757d;
+            font-weight: 400;
+            font-size: 0.85em;
+        }
+        
+        .recent-urls-list {
+            max-height: 400px;
+            overflow-y: auto;
+            border-radius: 10px;
+        }
+        
+        .recent-url-item {
+            padding: 15px;
+            margin-bottom: 10px;
+            border-radius: 10px;
+            border-left: 4px solid;
+            background: #f8f9fa;
+            transition: all 0.2s;
+        }
+        
+        .recent-url-item:hover {
+            transform: translateX(5px);
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .recent-url-item.success {
+            border-left-color: #52c41a;
+            background: linear-gradient(135deg, #f6ffed, #f0f9ff);
+        }
+        
+        .recent-url-item.error {
+            border-left-color: #ff4d4f;
+            background: linear-gradient(135deg, #fff1f0, #fff7f7);
+        }
+        
+        .url-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        
+        .url-domain {
+            font-weight: 600;
+            color: #495057;
+            font-size: 14px;
+        }
+        
+        .url-status {
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+        
+        .status-success {
+            background: linear-gradient(135deg, #52c41a, #73d13d);
+            color: white;
+        }
+        
+        .status-error {
+            background: linear-gradient(135deg, #ff4d4f, #ff7875);
+            color: white;
+        }
+        
+        .url-total-time {
+            font-family: 'Courier New', monospace;
+            font-weight: 700;
+            color: #667eea;
+            font-size: 13px;
+        }
+        
+        .url-timings {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-bottom: 8px;
+        }
+        
+        .step-timing {
+            padding: 3px 8px;
+            border-radius: 8px;
+            font-size: 10px;
+            font-weight: 600;
+            color: white;
+        }
+        
+        .step-timing.fetch {
+            background: #667eea;
+        }
+        
+        .step-timing.parse {
+            background: #52c41a;
+        }
+        
+        .step-timing.extract {
+            background: #fa8c16;
+        }
+        
+        .step-timing.save {
+            background: #eb2f96;
+        }
+        
+        .step-timing.add_links {
+            background: #722ed1;
+        }
+        
+        .url-time {
+            font-size: 11px;
+            color: #6c757d;
+            font-style: italic;
+        }
+        
+        .url-error {
+            margin-top: 8px;
+            padding: 8px;
+            background: #fff2f0;
+            border: 1px solid #ffccc7;
+            border-radius: 6px;
+            color: #cf1322;
+            font-size: 11px;
+        }
     </style>
 </head>
 <body>
@@ -566,6 +1015,7 @@ HTML_TEMPLATE = """
                 <button onclick="addWorker()" class="btn-success">➕ Add Worker</button>
                 <button onclick="startWorkers()" class="btn-success">▶️ Start All Workers</button>
                 <button onclick="stopWorkers()" class="btn-warning">⏹️ Stop All Workers</button>
+                <button onclick="refreshWorkerStatus()" class="btn-secondary">🔄 Refresh Status</button>
             </div>
         </div>
         
@@ -810,25 +1260,30 @@ HTML_TEMPLATE = """
         }
 
         function refreshWorkerStatus() {
-            fetch('/api/worker-stats', { 
-                method: 'GET',
-                signal: AbortSignal.timeout(5000) // 5 second timeout
-            })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        updateWorkerStats(data.data);
-                    } else {
-                        console.error('Worker stats API error:', data.error);
-                        // Try fallback to health endpoint
-                        refreshWorkerStatusFallback();
-                    }
+            // Fetch both worker stats and detailed timing data
+            Promise.all([
+                fetch('/api/worker-stats', { 
+                    method: 'GET',
+                    signal: AbortSignal.timeout(5000)
+                }),
+                fetch('/api/worker-timing-details', { 
+                    method: 'GET',
+                    signal: AbortSignal.timeout(5000)
                 })
-                .catch(error => {
-                    console.error('Error refreshing worker status:', error);
-                    // Try fallback to health endpoint
+            ])
+            .then(responses => Promise.all(responses.map(r => r.json())))
+            .then(([statsData, timingData]) => {
+                if (statsData.success) {
+                    updateWorkerStats(statsData.data, timingData.success ? timingData.data : {});
+                } else {
+                    console.error('Worker stats API error:', statsData.error);
                     refreshWorkerStatusFallback();
-                });
+                }
+            })
+            .catch(error => {
+                console.error('Error refreshing worker status:', error);
+                refreshWorkerStatusFallback();
+            });
         }
 
         function refreshWorkerStatusFallback() {
@@ -865,7 +1320,7 @@ HTML_TEMPLATE = """
                 });
         }
 
-        function updateWorkerStats(stats) {
+        function updateWorkerStats(stats, timingDetails = {}) {
             document.getElementById('total-workers').textContent = stats.total_workers || 0;
             document.getElementById('running-workers').textContent = Object.values(stats.workers || {}).filter(w => w.running).length;
             document.getElementById('system-status').textContent = stats.running ? 'Running' : 'Stopped';
@@ -873,19 +1328,268 @@ HTML_TEMPLATE = """
             const container = document.getElementById('worker-details-display');
             const workerCards = Object.entries(stats.workers || {}).map(([id, worker]) => {
                 const startedAt = worker.started_at ? new Date(parseFloat(worker.started_at) * 1000).toLocaleString() : 'N/A';
+                
+                // Enhanced step timings display with charts and detailed breakdown
+                let stepTimingsHtml = '';
+                if (worker.step_timings_summary && Object.keys(worker.step_timings_summary).length > 0) {
+                    // Create chart data for this worker
+                    const chartId = `timing-chart-${id}`;
+                    const chartData = Object.entries(worker.step_timings_summary);
+                    
+                    stepTimingsHtml = `
+                        <div class="timing-section">
+                            <div class="timing-header">
+                                <strong>📊 Step Timing Performance</strong>
+                                <small>(Last 100 URLs processed)</small>
+                            </div>
+                            
+                            <!-- Performance Summary Cards -->
+                            <div class="timing-cards">
+                                ${chartData.map(([step, stats]) => `
+                                    <div class="timing-card ${step}">
+                                        <div class="step-name">${step.charAt(0).toUpperCase() + step.slice(1)}</div>
+                                        <div class="avg-time">${stats.avg.toFixed(3)}s</div>
+                                        <div class="time-range">${stats.min.toFixed(3)}s - ${stats.max.toFixed(3)}s</div>
+                                        <div class="process-count">${stats.count} processed</div>
+                                        <div class="performance-indicator ${getPerformanceClass(step, stats.avg)}"></div>
+                                    </div>
+                                `).join('')}
+                            </div>
+                            
+                            <!-- Timing Chart -->
+                            <div class="chart-container">
+                                <canvas id="${chartId}" width="400" height="200"></canvas>
+                            </div>
+                            
+                            <!-- Detailed Statistics Table -->
+                            <div class="detailed-stats">
+                                <table class="timing-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Processing Step</th>
+                                            <th>Average</th>
+                                            <th>Min</th>
+                                            <th>Max</th>
+                                            <th>Count</th>
+                                            <th>Efficiency</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        ${chartData.map(([step, stats]) => {
+                                            const efficiency = calculateEfficiency(step, stats.avg);
+                                            return `
+                                                <tr>
+                                                    <td><span class="step-icon ${step}"></span>${step.charAt(0).toUpperCase() + step.slice(1)}</td>
+                                                    <td class="time-value">${stats.avg.toFixed(3)}s</td>
+                                                    <td class="time-value">${stats.min.toFixed(3)}s</td>
+                                                    <td class="time-value">${stats.max.toFixed(3)}s</td>
+                                                    <td class="count-value">${stats.count}</td>
+                                                    <td><span class="efficiency ${efficiency.class}">${efficiency.label}</span></td>
+                                                </tr>
+                                            `;
+                                        }).join('')}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    `;
+                    
+                    // Store chart data for later rendering
+                    setTimeout(() => renderTimingChart(chartId, chartData), 100);
+                } else {
+                    stepTimingsHtml = '<div class="no-timing-data">⏱️ No timing data available yet</div>';
+                }
+                
+                // Add recent URL processing details
+                let recentUrlsHtml = '';
+                const workerTimingData = timingDetails[id];
+                if (workerTimingData && workerTimingData.recent_timings && workerTimingData.recent_timings.length > 0) {
+                    recentUrlsHtml = `
+                        <div class="recent-urls-section">
+                            <div class="section-header">
+                                <strong>🕒 Recent URL Processing</strong>
+                                <small>(Last ${workerTimingData.recent_timings.length} URLs)</small>
+                            </div>
+                            <div class="recent-urls-list">
+                                ${workerTimingData.recent_timings.map(urlData => {
+                                    const totalTime = urlData.total_time.toFixed(3);
+                                    const timeAgo = formatTimeAgo(urlData.timestamp);
+                                    const statusClass = urlData.status_code === 200 ? 'success' : 'error';
+                                    const domain = new URL(urlData.url).hostname;
+                                    
+                                    return `
+                                        <div class="recent-url-item ${statusClass}">
+                                            <div class="url-header">
+                                                <span class="url-domain">${domain}</span>
+                                                <span class="url-status status-${statusClass}">${urlData.status_code || 'Error'}</span>
+                                                <span class="url-total-time">${totalTime}s</span>
+                                            </div>
+                                            <div class="url-timings">
+                                                ${Object.entries(urlData.timings).map(([step, time]) => `
+                                                    <span class="step-timing ${step}">
+                                                        ${step}: ${time.toFixed(3)}s
+                                                    </span>
+                                                `).join('')}
+                                            </div>
+                                            <div class="url-time">${timeAgo}</div>
+                                            ${urlData.error ? `<div class="url-error">Error: ${urlData.error}</div>` : ''}
+                                        </div>
+                                    `;
+                                }).join('')}
+                            </div>
+                        </div>
+                    `;
+                }
+                
                 return `
                 <div class="worker-card ${worker.running ? 'running' : 'stopped'}">
-                    <h4>Worker ${id}</h4>
-                    <p><strong>Status:</strong> ${worker.running ? '🟢 Running' : '🔴 Stopped'}</p>
-                    <p><strong>Processed URLs:</strong> ${worker.processed_urls || 0}</p>
-                    <p><strong>Failed URLs:</strong> ${worker.failed_urls || 0}</p>
-                    <p><strong>Total URLs:</strong> ${worker.total_urls || 0}</p>
-                    <p><strong>Started At:</strong> ${startedAt}</p>
-                    <p><strong>Thread Alive:</strong> ${worker.thread_alive ? 'Yes' : 'No'}</p>
-                </div>
-            `}).join('');
+                    <div class="worker-header">
+                        <h4>🔧 Worker ${id}</h4>
+                        <div class="worker-status ${worker.running ? 'online' : 'offline'}">
+                            ${worker.running ? '🟢 Running' : '🔴 Stopped'}
+                        </div>
+                    </div>
+                    
+                    <div class="worker-stats">
+                        <div class="stat-group">
+                            <div class="stat-item">
+                                <span class="stat-label">Processed URLs</span>
+                                <span class="stat-value">${worker.processed_urls || 0}</span>
+                            </div>
+                            <div class="stat-item">
+                                <span class="stat-label">Failed URLs</span>
+                                <span class="stat-value failed">${worker.failed_urls || 0}</span>
+                            </div>
+                            <div class="stat-item">
+                                <span class="stat-label">Success Rate</span>
+                                <span class="stat-value">${calculateSuccessRate(worker.processed_urls, worker.failed_urls)}%</span>
+                            </div>
+                        </div>
+                        
+                        <div class="worker-details">
+                            <p><strong>Started:</strong> ${startedAt}</p>
+                            <p><strong>Thread:</strong> ${worker.thread_alive ? '✅ Active' : '❌ Inactive'}</p>
+                            <p><strong>Total Processed:</strong> ${worker.total_urls || 0} URLs</p>
+                        </div>
+                    </div>
+                    
+                                         ${stepTimingsHtml}
+                     
+                     ${recentUrlsHtml}
+                 </div>
+             `}).join('');
             
             container.innerHTML = workerCards;
+        }
+
+        function getPerformanceClass(step, avgTime) {
+            // Define performance thresholds for each step
+            const thresholds = {
+                fetch: { good: 2.0, warning: 5.0 },
+                parse: { good: 0.1, warning: 0.5 },
+                extract: { good: 0.2, warning: 1.0 },
+                save: { good: 0.5, warning: 2.0 },
+                add_links: { good: 0.1, warning: 0.5 }
+            };
+            
+            const threshold = thresholds[step] || { good: 1.0, warning: 3.0 };
+            
+            if (avgTime <= threshold.good) return 'excellent';
+            if (avgTime <= threshold.warning) return 'good';
+            return 'needs-attention';
+        }
+
+        function calculateEfficiency(step, avgTime) {
+            const performance = getPerformanceClass(step, avgTime);
+            switch (performance) {
+                case 'excellent': return { class: 'excellent', label: '🚀 Excellent' };
+                case 'good': return { class: 'good', label: '👍 Good' };
+                default: return { class: 'warning', label: '⚠️ Slow' };
+            }
+        }
+
+        function calculateSuccessRate(processed, failed) {
+            const total = (processed || 0) + (failed || 0);
+            if (total === 0) return 100;
+            return ((processed || 0) / total * 100).toFixed(1);
+        }
+
+        function formatTimeAgo(timestamp) {
+            const now = Date.now() / 1000;
+            const diff = now - timestamp;
+            
+            if (diff < 60) return `${Math.floor(diff)}s ago`;
+            if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+            if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+            return `${Math.floor(diff / 86400)}d ago`;
+        }
+
+        function renderTimingChart(chartId, chartData) {
+            const canvas = document.getElementById(chartId);
+            if (!canvas) return;
+            
+            const ctx = canvas.getContext('2d');
+            const labels = chartData.map(([step]) => step.charAt(0).toUpperCase() + step.slice(1));
+            const avgTimes = chartData.map(([, stats]) => stats.avg);
+            const minTimes = chartData.map(([, stats]) => stats.min);
+            const maxTimes = chartData.map(([, stats]) => stats.max);
+            
+            new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            label: 'Average Time (s)',
+                            data: avgTimes,
+                            backgroundColor: 'rgba(102, 126, 234, 0.8)',
+                            borderColor: 'rgba(102, 126, 234, 1)',
+                            borderWidth: 1
+                        },
+                        {
+                            label: 'Min Time (s)',
+                            data: minTimes,
+                            backgroundColor: 'rgba(46, 204, 113, 0.6)',
+                            borderColor: 'rgba(46, 204, 113, 1)',
+                            borderWidth: 1
+                        },
+                        {
+                            label: 'Max Time (s)',
+                            data: maxTimes,
+                            backgroundColor: 'rgba(231, 76, 60, 0.6)',
+                            borderColor: 'rgba(231, 76, 60, 1)',
+                            borderWidth: 1
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: 'Step Processing Times'
+                        },
+                        legend: {
+                            position: 'top'
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: 'Time (seconds)'
+                            }
+                        },
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Processing Steps'
+                            }
+                        }
+                    }
+                }
+            });
         }
 
         function startAutoRefresh() {
@@ -1100,6 +1804,9 @@ HTML_TEMPLATE = """
             refreshWorkerStatus();
         });
     </script>
+    
+    <!-- Chart.js CDN for timing visualizations -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </body>
 </html>
 """ 

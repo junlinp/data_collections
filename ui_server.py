@@ -12,6 +12,7 @@ import logging
 from templates import HTML_TEMPLATE
 import redis
 import time
+import json
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -233,6 +234,59 @@ def api_worker_stats():
         return jsonify(response)
     else:
         return jsonify({'success': False, 'error': 'Failed to connect to crawler server'}), 500
+
+@app.route("/api/worker-timing-details", methods=["GET"])
+def api_worker_timing_details():
+    """API endpoint to get detailed step timing data for recent URLs"""
+    try:
+        r = redis.Redis(host="redis", port=6379, decode_responses=True)
+        
+        # Get worker IDs
+        workers_data = {}
+        
+        # Get list of worker timing keys
+        timing_keys = r.keys("crawler:metrics:worker_*:step_times")
+        
+        for key in timing_keys:
+            worker_id = key.split(':')[2]  # Extract worker_id from key
+            
+            # Get recent timing records (last 20)
+            timing_records = r.lrange(key, 0, 19)
+            
+            recent_timings = []
+            for record_json in timing_records:
+                try:
+                    record = json.loads(record_json)
+                    recent_timings.append({
+                        'url': record.get('url', ''),
+                        'timestamp': record.get('timestamp', 0),
+                        'timings': record.get('timings', {}),
+                        'status_code': record.get('status_code'),
+                        'error': record.get('error'),
+                        'total_time': sum(record.get('timings', {}).values())
+                    })
+                except json.JSONDecodeError:
+                    continue
+            
+            # Sort by timestamp (most recent first)
+            recent_timings.sort(key=lambda x: x['timestamp'], reverse=True)
+            
+            workers_data[worker_id] = {
+                'recent_timings': recent_timings[:10],  # Last 10 URLs
+                'total_records': len(timing_records)
+            }
+        
+        return jsonify({
+            'success': True,
+            'data': workers_data
+        })
+        
+    except Exception as e:
+        logger.error(f"Error getting worker timing details: {e}")
+        return jsonify({
+            'success': False,
+            'error': f'Error getting timing details: {str(e)}'
+        }), 500
 
 @app.route("/api/pending-urls", methods=["GET"])
 def api_pending_urls():

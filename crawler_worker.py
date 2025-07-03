@@ -31,6 +31,31 @@ class CrawlerWorker:
         # Create a session for better cookie handling
         self.session = requests.Session()
         
+        # Configure proxy settings from environment
+        import os
+        http_proxy = os.environ.get('HTTP_PROXY') or os.environ.get('http_proxy')
+        https_proxy = os.environ.get('HTTPS_PROXY') or os.environ.get('https_proxy')
+        if http_proxy and https_proxy:
+            self.session.proxies = {
+                'http': http_proxy,
+                'https': https_proxy
+            }
+            logger.info(f"Configured proxy: HTTP={http_proxy}, HTTPS={https_proxy}")
+        
+        # Configure SSL and retry settings for proxy compatibility
+        from requests.adapters import HTTPAdapter
+        from urllib3.util.retry import Retry
+        
+        # Configure retry strategy
+        retry_strategy = Retry(
+            total=3,
+            backoff_factor=1,
+            status_forcelist=[429, 500, 502, 503, 504],
+        )
+        adapter = HTTPAdapter(max_retries=retry_strategy)
+        self.session.mount("http://", adapter)
+        self.session.mount("https://", adapter)
+        
         # Enhanced headers to better mimic a real browser
         self.session.headers.update({
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
@@ -115,43 +140,75 @@ class CrawlerWorker:
                 time.sleep(5)  # Wait before retrying
     
     def _process_url(self, url):
-        """Process a single URL"""
-        # Skip binary files and non-HTML content
+        """Process a single URL with step-by-step timing"""
         if not self._should_process_url(url):
             logger.info(f"Worker {self.worker_id} skipping binary/non-HTML URL: {url}")
             return
-        
-        start_time = time.time()
+
+        timings = {}
+        step_start = time.time()
         status_code = None
         response_time = None
         content_length = None
-        
+        soup = None
+        title = None
+        content = None
+        links = None
+        error = None
+
         try:
-            # Make request
-            response = self.session.get(url, timeout=30, allow_redirects=True)
-            response_time = time.time() - start_time
+            # Step 1: Fetch URL
+            fetch_start = time.time()
+            
+            # Special handling for Baidu sites
+            if 'baidu.com' in url.lower():
+                # Add Baidu-specific headers
+                headers = {
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36',
+                    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+                    'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
+                    'Accept-Encoding': 'gzip, deflate',
+                    'Referer': 'https://www.baidu.com/',
+                    'Connection': 'keep-alive'
+                }
+                response = self.session.get(url, timeout=60, allow_redirects=True, headers=headers, verify=True)
+            else:
+                response = self.session.get(url, timeout=60, allow_redirects=True, verify=True)
+            fetch_time = time.time() - fetch_start
+            timings['fetch'] = fetch_time
             status_code = response.status_code
             content_length = len(response.content)
-            
+
             if response.status_code == 200:
-                # Check content type to ensure it's HTML
+                # Step 2: Check content type
                 content_type = response.headers.get('content-type', '').lower()
                 if not any(html_type in content_type for html_type in ['text/html', 'application/xhtml']):
                     logger.info(f"Worker {self.worker_id} skipping non-HTML content: {url} (Content-Type: {content_type})")
                     return
-                
-                # Parse content
+
+                # Step 3: Parse HTML
+                parse_start = time.time()
                 soup = BeautifulSoup(response.content, 'html.parser')
-                
-                # Extract data
+                parse_time = time.time() - parse_start
+                timings['parse'] = parse_time
+
+                # Step 4: Extract data
+                extract_start = time.time()
                 title = self._extract_title(soup)
                 content = self._extract_content(soup)
-                links = self._extract_links(soup, url)
-                
-                # Save to database
-                self._save_content(url, title, content, response.text, links, status_code, response_time, content_length)
-                
-                # Add discovered links to the queue for continuous crawling
+                # Use current URL domain as base domain for same-domain filtering
+                links = self._extract_links(soup, url, url)
+                extract_time = time.time() - extract_start
+                timings['extract'] = extract_time
+
+                # Step 5: Save to DB
+                save_start = time.time()
+                self._save_content(url, title, content, response.text, links, status_code, fetch_time, content_length)
+                save_time = time.time() - save_start
+                timings['save'] = save_time
+
+                # Step 6: Add discovered links
+                add_links_start = time.time()
                 try:
                     for link in json.loads(links):
                         if self.queue.add_url(link):
@@ -159,33 +216,54 @@ class CrawlerWorker:
                     self.redis.hset(self.metrics_key, 'queue_length', self.queue.queue_length())
                 except Exception as e:
                     logger.error(f"Error adding discovered links for {url}: {e}")
-                
+                add_links_time = time.time() - add_links_start
+                timings['add_links'] = add_links_time
+
                 self.redis.hincrby(self.metrics_key, 'completed_urls', 1)
                 self.redis.hincrby(f'{self.metrics_key}:{self.worker_id}', 'processed_urls', 1)
                 self.redis.hset(self.metrics_key, 'last_crawled_url', url)
                 self.redis.hset(self.metrics_key, 'queue_length', self.queue.queue_length())
                 logger.info(f"Worker {self.worker_id} successfully processed {url}")
-                
+                logger.info(f"Worker {self.worker_id} DEBUG: About to exit success branch for {url}")
+
             else:
-                # HTTP error
                 self.redis.hincrby(self.metrics_key, 'failed_urls', 1)
                 self.redis.hincrby(f'{self.metrics_key}:{self.worker_id}', 'failed_urls', 1)
                 self.redis.hset(self.metrics_key, 'queue_length', self.queue.queue_length())
                 logger.warning(f"Worker {self.worker_id} failed to process {url}: HTTP {response.status_code}")
-                
+                error = f"HTTP {response.status_code}"
+
         except requests.exceptions.RequestException as e:
-            # Network error
             self.redis.hincrby(self.metrics_key, 'failed_urls', 1)
             self.redis.hincrby(f'{self.metrics_key}:{self.worker_id}', 'failed_urls', 1)
             self.redis.hset(self.metrics_key, 'queue_length', self.queue.queue_length())
             logger.error(f"Worker {self.worker_id} request error for {url}: {e}")
-            
+            error = str(e)
         except Exception as e:
-            # Other error
             self.redis.hincrby(self.metrics_key, 'failed_urls', 1)
             self.redis.hincrby(f'{self.metrics_key}:{self.worker_id}', 'failed_urls', 1)
             self.redis.hset(self.metrics_key, 'queue_length', self.queue.queue_length())
             logger.error(f"Worker {self.worker_id} processing error for {url}: {e}")
+            error = str(e)
+
+        logger.info(f"Worker {self.worker_id} DEBUG: About to reach timing storage for {url}")
+        # Store step timings in Redis (as a capped list, last 100 entries)
+        logger.info(f"Worker {self.worker_id} REACHED timing storage section for URL: {url}")
+        timings_record = {
+            'url': url,
+            'timestamp': time.time(),
+            'timings': timings,
+            'status_code': status_code,
+            'error': error,
+        }
+        timings_key = f'{self.metrics_key}:{self.worker_id}:step_times'
+        try:
+            logger.info(f"Worker {self.worker_id} storing timing data for {url}: {timings}")
+            self.redis.lpush(timings_key, json.dumps(timings_record))
+            self.redis.ltrim(timings_key, 0, 99)  # Keep only last 100
+            logger.info(f"Worker {self.worker_id} successfully stored timing data in key: {timings_key}")
+        except Exception as e:
+            logger.error(f"Worker {self.worker_id} failed to store timing data: {e}")
     
     def _extract_title(self, soup):
         """Extract title from HTML"""
@@ -210,15 +288,25 @@ class CrawlerWorker:
         
         return text
     
-    def _extract_links(self, soup, base_url):
-        """Extract links from HTML"""
+    def _extract_links(self, soup, current_url, base_url):
+        """Extract links from HTML - only same domain"""
         links = []
         for link in soup.find_all('a', href=True):
-            href = link['href']
-            absolute_url = urljoin(base_url, href)
+            href = link['href'].strip()
+            if not href:
+                continue
+                
+            try:
+                absolute_url = urljoin(current_url, href)
+            except Exception as e:
+                logger.warning(f"Error joining URL {current_url} with {href}: {e}")
+                continue
             
-            # Only add links that should be processed
-            if self._should_process_url(absolute_url):
+            # Filter links - only same domain and processable URLs
+            if (not absolute_url.startswith(('javascript:', 'mailto:', '#', 'tel:', 'ftp:')) and
+                not absolute_url.endswith(('.pdf', '.jpg', '.jpeg', '.png', '.gif', '.css', '.js', '.xml', '.zip', '.exe')) and
+                self._should_process_url(absolute_url) and
+                self._is_same_domain(base_url, absolute_url)):
                 links.append(absolute_url)
         
         return json.dumps(links)
@@ -261,6 +349,23 @@ class CrawlerWorker:
         
         return True
     
+    def _is_same_domain(self, base_url, link_url):
+        """Check if link is from the same domain as base URL"""
+        try:
+            base_domain = urlparse(base_url).netloc.lower()
+            link_domain = urlparse(link_url).netloc.lower()
+            
+            # Handle www vs non-www
+            if base_domain.startswith('www.'):
+                base_domain = base_domain[4:]
+            if link_domain.startswith('www.'):
+                link_domain = link_domain[4:]
+                
+            return base_domain == link_domain
+        except Exception as e:
+            logger.warning(f"Error checking domain for {link_url}: {e}")
+            return False
+    
     def _save_content(self, url, title, content, html_content, links, status_code, response_time, content_length):
         """Save crawled content to MongoDB"""
         try:
@@ -284,14 +389,40 @@ class CrawlerWorker:
             logger.error(f"Error saving content for {url} to MongoDB: {e}")
     
     def get_worker_stats(self):
-        """Get worker statistics"""
+        """Get worker statistics, including step timing summary"""
         try:
-            # Get worker metrics from Redis (more efficient than database query)
             worker_metrics = self.redis.hgetall(f'{self.metrics_key}:{self.worker_id}')
             processed_count = int(worker_metrics.get('processed_urls', 0))
             failed_count = int(worker_metrics.get('failed_urls', 0))
             started_at = worker_metrics.get('started_at', 0)
-            
+
+            # Step timing summary
+            timings_key = f'{self.metrics_key}:{self.worker_id}:step_times'
+            timings_list = self.redis.lrange(timings_key, 0, 99)
+            step_sums = {}
+            step_counts = {}
+            step_mins = {}
+            step_maxs = {}
+            for rec_json in timings_list:
+                try:
+                    rec = json.loads(rec_json)
+                    for step, t in rec.get('timings', {}).items():
+                        step_sums[step] = step_sums.get(step, 0.0) + t
+                        step_counts[step] = step_counts.get(step, 0) + 1
+                        step_mins[step] = min(step_mins.get(step, t), t) if step in step_mins else t
+                        step_maxs[step] = max(step_maxs.get(step, t), t) if step in step_maxs else t
+                except Exception:
+                    continue
+            step_summary = {}
+            for step in step_sums:
+                count = step_counts[step]
+                step_summary[step] = {
+                    'avg': step_sums[step] / count if count else 0.0,
+                    'min': step_mins[step],
+                    'max': step_maxs[step],
+                    'count': count
+                }
+
             return {
                 'worker_id': self.worker_id,
                 'running': self.running,
@@ -299,9 +430,9 @@ class CrawlerWorker:
                 'failed_urls': failed_count,
                 'total_urls': processed_count + failed_count,
                 'started_at': started_at,
-                'thread_alive': self.thread.is_alive() if self.thread else False
+                'thread_alive': self.thread.is_alive() if self.thread else False,
+                'step_timings_summary': step_summary
             }
-            
         except Exception as e:
             logger.error(f"Error getting worker stats: {e}")
             return {
@@ -311,7 +442,8 @@ class CrawlerWorker:
                 'failed_urls': 0,
                 'total_urls': 0,
                 'started_at': 0,
-                'thread_alive': self.thread.is_alive() if self.thread else False
+                'thread_alive': self.thread.is_alive() if self.thread else False,
+                'step_timings_summary': {}
             }
 
     def add_url_to_queue(self, url):
