@@ -12,8 +12,6 @@ db.createCollection('summaries');
 // Create indexes for better performance
 db.web_content.createIndex({ "url": 1 }, { unique: true });
 db.web_content.createIndex({ "created_at": 1 });
-db.web_content.createIndex({ "crawl_depth": 1 });
-db.web_content.createIndex({ "status_code": 1 });
 
 db.url_history.createIndex({ "url": 1 });
 db.url_history.createIndex({ "created_at": 1 });

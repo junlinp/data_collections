@@ -19,9 +19,7 @@ class Config:
     PORT = int(os.getenv('PORT', 5000))
     
     # Crawler settings
-    DEFAULT_MAX_DEPTH = int(os.getenv('DEFAULT_MAX_DEPTH', 2))
     DEFAULT_MAX_PAGES = int(os.getenv('DEFAULT_MAX_PAGES', 50))
-    MAX_DEPTH_LIMIT = int(os.getenv('MAX_DEPTH_LIMIT', 5))
     MAX_PAGES_LIMIT = int(os.getenv('MAX_PAGES_LIMIT', 200))
     
     # Request settings
@@ -48,7 +46,6 @@ class Config:
     def get_crawler_settings(cls):
         """Get crawler-specific settings"""
         return {
-            'max_depth': cls.DEFAULT_MAX_DEPTH,
             'max_pages': cls.DEFAULT_MAX_PAGES,
             'timeout': cls.REQUEST_TIMEOUT,
             'delay': cls.REQUEST_DELAY,
@@ -69,14 +66,12 @@ class Config:
 class DevelopmentConfig(Config):
     """Development configuration"""
     DEBUG = True
-    DEFAULT_MAX_DEPTH = 2
     DEFAULT_MAX_PAGES = 20
     REQUEST_DELAY = 0.5
 
 class ProductionConfig(Config):
     """Production configuration"""
     DEBUG = False
-    DEFAULT_MAX_DEPTH = 3
     DEFAULT_MAX_PAGES = 100
     REQUEST_DELAY = 2.0
     HOST = '0.0.0.0'
@@ -86,7 +81,6 @@ class TestingConfig(Config):
     DEBUG = True
     CONTENT_DB_PATH = 'test_web_crawler.db'
     URL_HISTORY_DB_PATH = 'test_url_history.db'
-    DEFAULT_MAX_DEPTH = 1
     DEFAULT_MAX_PAGES = 5
     REQUEST_DELAY = 0.1
 

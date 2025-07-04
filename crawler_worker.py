@@ -147,7 +147,6 @@ class CrawlerWorker:
 
         timings = {}
         step_start = time.time()
-        status_code = None
         response_time = None
         content_length = None
         soup = None
@@ -176,7 +175,6 @@ class CrawlerWorker:
                 response = self.session.get(url, timeout=60, allow_redirects=True, verify=True)
             fetch_time = time.time() - fetch_start
             timings['fetch'] = fetch_time
-            status_code = response.status_code
             content_length = len(response.content)
 
             if response.status_code == 200:
@@ -203,7 +201,7 @@ class CrawlerWorker:
 
                 # Step 5: Save to DB
                 save_start = time.time()
-                self._save_content(url, title, content, response.text, links, status_code, fetch_time, content_length)
+                self._save_content(url, title, content, response.text, links, fetch_time, content_length)
                 save_time = time.time() - save_start
                 timings['save'] = save_time
 
@@ -230,8 +228,8 @@ class CrawlerWorker:
                 self.redis.hincrby(self.metrics_key, 'failed_urls', 1)
                 self.redis.hincrby(f'{self.metrics_key}:{self.worker_id}', 'failed_urls', 1)
                 self.redis.hset(self.metrics_key, 'queue_length', self.queue.queue_length())
-                logger.warning(f"Worker {self.worker_id} failed to process {url}: HTTP {response.status_code}")
-                error = f"HTTP {response.status_code}"
+                logger.warning(f"Worker {self.worker_id} failed to process {url}: HTTP error")
+                error = "HTTP error"
 
         except requests.exceptions.RequestException as e:
             self.redis.hincrby(self.metrics_key, 'failed_urls', 1)
@@ -253,7 +251,6 @@ class CrawlerWorker:
             'url': url,
             'timestamp': time.time(),
             'timings': timings,
-            'status_code': status_code,
             'error': error,
         }
         timings_key = f'{self.metrics_key}:{self.worker_id}:step_times'
@@ -366,7 +363,7 @@ class CrawlerWorker:
             logger.warning(f"Error checking domain for {link_url}: {e}")
             return False
     
-    def _save_content(self, url, title, content, html_content, links, status_code, response_time, content_length):
+    def _save_content(self, url, title, content, html_content, links, response_time, content_length):
         """Save crawled content to MongoDB"""
         try:
             # Save to MongoDB using the manager
@@ -375,8 +372,6 @@ class CrawlerWorker:
                 title=title,
                 html_content=html_content,
                 text_content=content,
-                status_code=status_code,
-                crawl_depth=0,
                 parent_url=None
             )
             

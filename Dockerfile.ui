@@ -11,7 +11,6 @@ RUN pip install --no-cache-dir -r requirements_ui.txt
 
 # Copy application code
 COPY templates.py .
-COPY memory_utils.py .
 
 # Set environment variables
 ENV UI_PORT=5000

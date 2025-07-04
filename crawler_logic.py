@@ -133,7 +133,7 @@ class WebCrawler:
         # MongoDB connection is already initialized in constructor
         pass
     
-    def save_content_to_db(self, url, title, content, html_content, links, depth=0):
+    def save_content_to_db(self, url, title, content, html_content, links):
         """Save crawled content to MongoDB"""
         try:
             # Convert links to string if it's a list
@@ -143,9 +143,7 @@ class WebCrawler:
                 url=url,
                 title=title or '',
                 html_content=html_content or '',
-                text_content=content or '',
-                status_code=200,  # Default status code
-                crawl_depth=depth or 0
+                text_content=content or ''
             )
             return success
         except Exception as e:
@@ -175,8 +173,7 @@ class WebCrawler:
                     doc.get('title', ''),
                     doc.get('text_content', ''),
                     doc.get('links', ''),
-                    doc.get('created_at', ''),
-                    doc.get('crawl_depth', 0)
+                    doc.get('created_at', '')
                 ))
             
             return data
@@ -199,8 +196,7 @@ class WebCrawler:
                     doc.get('text_content', ''),
                     doc.get('html_content', ''),
                     doc.get('links', ''),
-                    doc.get('created_at', ''),
-                    doc.get('crawl_depth', 0)
+                    doc.get('created_at', '')
                 ))
             
             return data
@@ -489,7 +485,6 @@ class WebCrawler:
             # Save to URL history database
             self.url_manager.add_url(
                 url=normalized_url,
-                status_code=response.status_code,
                 response_time=response_time,
                 content_length=len(response.content),
                 metadata={
@@ -523,7 +518,6 @@ class WebCrawler:
             # Still record the failed attempt in URL history
             self.url_manager.add_url(
                 url=normalized_url,
-                status_code=None,
                 response_time=None,
                 content_length=None,
                 metadata={'error': str(e)}

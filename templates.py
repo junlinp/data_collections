@@ -908,9 +908,7 @@ HTML_TEMPLATE = """
         
         <div class="nav-tabs">
             <a href="#queue" class="active" onclick="showTab('queue', event)">Add to Queue</a>
-            <a href="#status" onclick="showTab('status', event)">Queue Status</a>
-            <a href="#workers" onclick="showTab('workers', event)">Workers</a>
-            <a href="#data" onclick="showTab('data', event)">View Data</a>
+            <a href="#status" onclick="showTab('status', event)">Queue & Workers</a>
         </div>
         
         <div id="queue-tab" style="display: block;">
@@ -945,7 +943,7 @@ HTML_TEMPLATE = """
         </div>
         
         <div id="status-tab" style="display: none;">
-            <h2>📊 Queue Status</h2>
+            <h2>📊 Queue Status & Worker Management</h2>
             
             <div class="auto-refresh">
                 <input type="checkbox" id="auto-refresh" checked>
@@ -954,127 +952,71 @@ HTML_TEMPLATE = """
                 <span id="status-tab-indicator" style="margin-left: 10px; color: #28a745; font-weight: bold; display: none;">✓ Status Tab Active</span>
             </div>
             
-            <div id="queue-stats-display" class="stats-grid">
-                <div class="stat-card">
-                    <h4>📈 Queue Statistics</h4>
-                    <p><strong>Completed URLs:</strong> <span id="completed-urls">-</span></p>
-                    <p><strong>Failed URLs:</strong> <span id="failed-urls">-</span></p>
+            <!-- Queue Status Section -->
+            <div style="margin-bottom: 40px;">
+                <h3>📈 Queue Status</h3>
+                <div id="queue-stats-display" class="stats-grid">
+                    <div class="stat-card">
+                        <h4>📈 Queue Statistics</h4>
+                        <p><strong>Completed URLs:</strong> <span id="completed-urls">-</span></p>
+                        <p><strong>Failed URLs:</strong> <span id="failed-urls">-</span></p>
+                    </div>
+                    <div class="stat-card">
+                        <h4>📊 Content Database</h4>
+                        <p><strong>Total Records:</strong> <span id="content-records">-</span></p>
+                        <p><strong>Total Visits:</strong> <span id="total-visits">-</span></p>
+                    </div>
+                    <div class="stat-card">
+                        <h4>🗃️ Redis Queue Status</h4>
+                        <p><strong>Pending in Redis:</strong> <span id="redis-queue-length">{{ redis_queue_length }}</span></p>
+                        <p><strong>Visited (24h):</strong> <span id="redis-visited-count">{{ redis_visited_count }}</span></p>
+                    </div>
                 </div>
-                <div class="stat-card">
-                    <h4>📊 Content Database</h4>
-                    <p><strong>Total Records:</strong> <span id="content-records">-</span></p>
-                    <p><strong>Total Visits:</strong> <span id="total-visits">-</span></p>
+                <div style="margin: 30px 0;">
+                    <h4>📈 Queue Size Trend (Last 24h)</h4>
+                    <canvas id="queueTrendChart" height="80"></canvas>
                 </div>
-                <div class="stat-card">
-                    <h4>🗃️ Redis Queue Status</h4>
-                    <p><strong>Pending in Redis:</strong> <span id="redis-queue-length">{{ redis_queue_length }}</span></p>
-                    <p><strong>Visited (24h):</strong> <span id="redis-visited-count">{{ redis_visited_count }}</span></p>
+                <div id="pending-urls-display">
+                    <h3>⏳ Pending URLs</h3>
+                    <div id="pending-urls-table"></div>
                 </div>
-            </div>
-            <div style="margin: 30px 0;">
-                <h4>📈 Queue Size Trend (Last 24h)</h4>
-                <canvas id="queueTrendChart" height="80"></canvas>
-            </div>
-            <div id="pending-urls-display">
-                <h3>⏳ Pending URLs</h3>
-                <div id="pending-urls-table"></div>
-            </div>
-            
-            <div class="queue-actions">
-                <button onclick="clearQueue()" class="btn-danger">🗑️ Clear Queue</button>
-                <button onclick="startWorkers()" class="btn-success">▶️ Start Workers</button>
-                <button onclick="stopWorkers()" class="btn-warning">⏹️ Stop Workers</button>
-            </div>
-        </div>
-        
-        <div id="workers-tab" style="display: none;">
-            <h2>🔧 Worker Management</h2>
-            
-            <div class="worker-info">
-                <strong>Worker System:</strong><br>
-                • <strong>Background Processing:</strong> Workers run continuously in background<br>
-                • <strong>Automatic Queue Processing:</strong> Workers pick up URLs automatically<br>
-                • <strong>Scalable:</strong> Add/remove workers as needed<br>
-                • <strong>Fault Tolerant:</strong> Failed URLs are marked and tracked
-            </div>
-            
-            <div id="worker-stats-display" class="stats-grid">
-                <div class="stat-card">
-                    <h4>👥 Worker Status</h4>
-                    <p><strong>Total Workers:</strong> <span id="total-workers">-</span></p>
-                    <p><strong>Running Workers:</strong> <span id="running-workers">-</span></p>
-                    <p><strong>System Status:</strong> <span id="system-status">-</span></p>
+                
+                <div class="queue-actions">
+                    <button onclick="clearQueue()" class="btn-danger">🗑️ Clear Queue</button>
                 </div>
             </div>
-            
-            <div id="worker-details-display" class="worker-grid">
-                <!-- Worker details will be populated here -->
-            </div>
-            
-            <div class="queue-actions">
-                <button onclick="addWorker()" class="btn-success">➕ Add Worker</button>
-                <button onclick="startWorkers()" class="btn-success">▶️ Start All Workers</button>
-                <button onclick="stopWorkers()" class="btn-warning">⏹️ Stop All Workers</button>
-                <button onclick="refreshWorkerStatus()" class="btn-secondary">🔄 Refresh Status</button>
-            </div>
-        </div>
-        
-        <div id="data-tab" style="display: none;">
-            <h2>📊 Crawled Data</h2>
-            
-            <div class="search-box">
-                <input type="search" id="data-search" placeholder="Search URLs or titles..." onkeyup="searchData()">
-                <button onclick="searchData()">🔍 Search</button>
-                <button onclick="clearSearch()">🗑️ Clear</button>
-            </div>
-            
-            <div id="data-stats" class="stats-grid">
-                <div class="stat-card">
-                    <h4>Database Stats</h4>
-                    <p><strong>Total Pages:</strong> <span id="total-pages">{{ crawled_data|length if crawled_data else 0 }}</span></p>
-                    <p><strong>Data Available:</strong> Content + HTML</p>
+
+            <!-- Worker Management Section -->
+            <div>
+                <h3>🔧 Worker Management</h3>
+                
+                <div class="worker-info">
+                    <strong>Worker System:</strong><br>
+                    • <strong>Background Processing:</strong> Workers run continuously in background<br>
+                    • <strong>Automatic Queue Processing:</strong> Workers pick up URLs automatically<br>
+                    • <strong>Scalable:</strong> Add/remove workers as needed<br>
+                    • <strong>Fault Tolerant:</strong> Failed URLs are marked and tracked
                 </div>
-            </div>
-            
-            <div id="data-table-container">
-                {% if crawled_data %}
-                    <table class="data-table" id="data-table">
-                        <thead>
-                            <tr>
-                                <th>URL</th>
-                                <th>Title</th>
-                                <th>Content Preview</th>
-                                <th>Status</th>
-                                <th>Response Time</th>
-                                <th>Crawled At</th>
-                                <th>Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody id="data-tbody">
-                        {% for item in crawled_data %}
-                            <tr>
-                                <td><a href="{{ item.url }}" target="_blank">{{ item.url }}</a></td>
-                                <td>{{ item.title or 'No title' }}</td>
-                                <td class="content-preview">{{ item.content[:100] }}{% if item.content|length > 100 %}...{% endif %}</td>
-                                <td>
-                                    <span class="status-{{ 'completed' if item.status_code == 200 else 'failed' }}">
-                                        {{ item.status_code or 'Unknown' }}
-                                    </span>
-                                </td>
-                                <td>{{ "%.2f"|format(item.response_time or 0) }}s</td>
-                                <td>{{ item.crawled_at }}</td>
-                                <td>
-                                    <a href="/html/{{ item.url | urlencode }}" class="html-link" target="_blank">
-                                        View HTML
-                                    </a>
-                                </td>
-                            </tr>
-                        {% endfor %}
-                        </tbody>
-                    </table>
-                {% else %}
-                    <p>No data has been crawled yet. Add URLs to the queue to start crawling.</p>
-                {% endif %}
+                
+                <div id="worker-stats-display" class="stats-grid">
+                    <div class="stat-card">
+                        <h4>👥 Worker Status</h4>
+                        <p><strong>Total Workers:</strong> <span id="total-workers">-</span></p>
+                        <p><strong>Running Workers:</strong> <span id="running-workers">-</span></p>
+                        <p><strong>System Status:</strong> <span id="system-status">-</span></p>
+                    </div>
+                </div>
+                
+                <div id="worker-details-display" class="worker-grid">
+                    <!-- Worker details will be populated here -->
+                </div>
+                
+                <div class="queue-actions">
+                    <button onclick="addWorker()" class="btn-success">➕ Add Worker</button>
+                    <button onclick="startWorkers()" class="btn-success">▶️ Start All Workers</button>
+                    <button onclick="stopWorkers()" class="btn-warning">⏹️ Stop All Workers</button>
+                    <button onclick="refreshWorkerStatus()" class="btn-secondary">🔄 Refresh Status</button>
+                </div>
             </div>
         </div>
     </div>
@@ -1109,16 +1051,7 @@ HTML_TEMPLATE = """
                 startAutoRefresh();
                 setTimeout(() => {
                     refreshQueueStatus();
-                }, 100);
-            } else if (tabName === 'workers') {
-                startAutoRefresh();
-                setTimeout(() => {
                     refreshWorkerStatus();
-                }, 100);
-            } else if (tabName === 'data') {
-                stopAutoRefresh();
-                setTimeout(() => {
-                    loadData();
                 }, 100);
             } else {
                 stopAutoRefresh();
@@ -1414,14 +1347,14 @@ HTML_TEMPLATE = """
                                 ${workerTimingData.recent_timings.map(urlData => {
                                     const totalTime = urlData.total_time.toFixed(3);
                                     const timeAgo = formatTimeAgo(urlData.timestamp);
-                                    const statusClass = urlData.status_code === 200 ? 'success' : 'error';
+                                    const statusClass = urlData.error ? 'error' : 'success';
                                     const domain = new URL(urlData.url).hostname;
                                     
                                     return `
                                         <div class="recent-url-item ${statusClass}">
                                             <div class="url-header">
                                                 <span class="url-domain">${domain}</span>
-                                                <span class="url-status status-${statusClass}">${urlData.status_code || 'Error'}</span>
+                                                <span class="url-status status-${statusClass}">${urlData.error ? 'Error' : 'Success'}</span>
                                                 <span class="url-total-time">${totalTime}s</span>
                                             </div>
                                             <div class="url-timings">
@@ -1598,10 +1531,9 @@ HTML_TEMPLATE = """
             }
             autoRefreshInterval = setInterval(() => {
                 if (document.getElementById('auto-refresh').checked) {
-                    // Check which tab is active and refresh accordingly
+                    // Check if status tab is active and refresh both queue and worker data
                     if (document.getElementById('status-tab').style.display !== 'none') {
                         refreshQueueStatus();
-                    } else if (document.getElementById('workers-tab').style.display !== 'none') {
                         refreshWorkerStatus();
                     }
                 }
@@ -1683,65 +1615,6 @@ HTML_TEMPLATE = """
                     console.error('Error adding worker:', error);
                     showMessage('Error adding worker', 'error');
                 });
-        }
-
-        function searchData() {
-            const searchTerm = document.getElementById('data-search').value.trim();
-            currentSearch = searchTerm;
-            currentPage = 1;
-            loadData();
-        }
-
-        function clearSearch() {
-            document.getElementById('data-search').value = '';
-            currentSearch = '';
-            currentPage = 1;
-            loadData();
-        }
-
-        function loadData() {
-            const params = new URLSearchParams({
-                limit: 50,
-                offset: (currentPage - 1) * 50
-            });
-            
-            fetch(`/api/crawled-data?${params}`)
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        updateDataTable(data.data);
-                    }
-                })
-                .catch(error => console.error('Error loading data:', error));
-        }
-
-        function updateDataTable(data) {
-            const tbody = document.getElementById('data-tbody');
-            
-            if (data.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="8">No data available</td></tr>';
-                return;
-            }
-            
-            tbody.innerHTML = data.map(item => `
-                <tr>
-                    <td><a href="${item.url}" target="_blank">${item.url}</a></td>
-                    <td>${item.title || 'No title'}</td>
-                    <td class="content-preview">${item.content ? (item.content.substring(0, 100) + (item.content.length > 100 ? '...' : '')) : ''}</td>
-                    <td>
-                        <span class="status-${item.status_code === 200 ? 'completed' : 'failed'}">
-                            ${item.status_code || 'Unknown'}
-                        </span>
-                    </td>
-                    <td>${item.response_time ? item.response_time.toFixed(2) : '0.00'}s</td>
-                    <td>${item.crawled_at}</td>
-                    <td>
-                        <a href="/html/${encodeURIComponent(item.url)}" class="html-link" target="_blank">
-                            View HTML
-                        </a>
-                    </td>
-                </tr>
-            `).join('');
         }
 
         function updateRedisQueueStats() {

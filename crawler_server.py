@@ -400,7 +400,7 @@ def api_crawled_data():
                 'title': content.get('title'),
                 'content': text_content[:500] + '...' if text_content and len(text_content) > 500 else text_content,
                 'crawled_at': content.get('created_at'),
-                'status_code': content.get('status_code'),
+
                 'response_time': None,  # Not stored in MongoDB currently
                 'content_length': len(text_content) if text_content else 0
             })

@@ -38,7 +38,7 @@ class MongoDBManager:
             self.client.close()
             logger.info("MongoDB connection closed")
     
-    def save_web_content(self, url, title, html_content, text_content, status_code, crawl_depth, parent_url=None):
+    def save_web_content(self, url, title, html_content, text_content, parent_url=None):
         """Save web content to MongoDB"""
         try:
             content_doc = {
@@ -46,8 +46,6 @@ class MongoDBManager:
                 'title': title,
                 'html_content': html_content,
                 'text_content': text_content,
-                'status_code': status_code,
-                'crawl_depth': crawl_depth,
                 'parent_url': parent_url,
                 'created_at': datetime.utcnow(),
                 'updated_at': datetime.utcnow()

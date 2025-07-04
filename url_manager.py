@@ -13,12 +13,11 @@ class URLManager:
         # MongoDB connection is already initialized in constructor
         pass
     
-    def add_url(self, url, crawl_depth=0, status_code=None, response_time=None, 
-                content_length=None, metadata=None):
+    def add_url(self, url, response_time=None, content_length=None, metadata=None):
         """Add or update a URL in the history using MongoDB"""
         try:
             # For now, use a simple status approach
-            status = f"crawl_depth:{crawl_depth},status_code:{status_code},response_time:{response_time}"
+            status = f"response_time:{response_time}"
             if metadata:
                 status += f",metadata:{json.dumps(metadata)}"
             
@@ -42,8 +41,6 @@ class URLManager:
                     'first_visited': latest.get('created_at'),
                     'last_visited': latest.get('created_at'),
                     'visit_count': 1,  # Simplified for now
-                    'crawl_depth': 0,  # Would need to parse from status
-                    'status_code': None,  # Would need to parse from status
                     'response_time': None,  # Would need to parse from status
                     'content_length': None,
                     'metadata': None  # Would need to parse from status

@@ -48,14 +48,10 @@ def index():
     """Main page with crawling interface - optimized for memory efficiency"""
     url = request.args.get("url")
     action = request.args.get("action")
-    show_data = request.args.get("show_data") == "true"
-    show_history = request.args.get("show_history") == "true"
-    show_queue = request.args.get("show_queue") == "true"
-    show_workers = request.args.get("show_workers") == "true"
+    show_queue = request.args.get("show_queue") == "true" or request.args.get("show_status") == "true"
     
     message = ""
     success = False
-    crawl_results = None
 
     if url and action == "add_to_queue":
         # Add URL to queue
@@ -68,7 +64,6 @@ def index():
             success = False
 
     # Only fetch data that's actually needed based on the active tab
-    crawled_data = []
     queue_stats = {}
     worker_stats = {}
     pending_urls = []
@@ -79,13 +74,7 @@ def index():
     if status_response and status_response.get('success'):
         crawling_in_progress = status_response['data']['crawling_in_progress']
 
-    # Only fetch data for the active tab to reduce memory usage
-    if show_data:
-        # Get crawled data with pagination
-        data_response = make_crawler_request("/api/crawled-data", params={"limit": 50, "offset": 0})
-        if data_response and data_response.get('success'):
-            crawled_data = data_response['data']
-
+    # Fetch queue and worker data if status tab is active
     if show_queue:
         # Get queue stats (lightweight)
         queue_response = make_crawler_request("/api/queue-stats")
@@ -108,7 +97,6 @@ def index():
         else:
             pending_urls = []
 
-    if show_workers:
         # Get worker stats
         worker_response = make_crawler_request("/api/worker-stats")
         if worker_response and worker_response.get('success'):
@@ -124,33 +112,28 @@ def index():
                                 url=url,
                                 message=message, 
                                 success=success,
-                                crawl_results=crawl_results,
-                                crawled_data=crawled_data,
                                 queue_stats=queue_stats,  # Use crawler API data
                                 worker_stats=worker_stats,
                                 pending_urls=pending_urls,
                                 crawling_in_progress=crawling_in_progress,
-                                show_data=show_data,
-                                show_history=show_history,
                                 show_queue=show_queue,
-                                show_workers=show_workers,
                                 redis_queue_length=queue_stats.get('queued_urls', 0),
                                 redis_visited_count=visited_count)
 
 @app.route("/data")
 def view_data():
-    """Redirect to main page with data tab active"""
-    return redirect(url_for('index', show_data='true'))
+    """Redirect to main page with status tab active (data functionality removed)"""
+    return redirect(url_for('index', show_status='true'))
 
 @app.route("/queue")
 def view_queue():
-    """Redirect to main page with queue tab active"""
-    return redirect(url_for('index', show_queue='true'))
+    """Redirect to main page with status tab active"""
+    return redirect(url_for('index', show_status='true'))
 
 @app.route("/workers")
 def view_workers():
-    """Redirect to main page with workers tab active"""
-    return redirect(url_for('index', show_workers='true'))
+    """Redirect to main page with status tab active (workers merged with queue)"""
+    return redirect(url_for('index', show_status='true'))
 
 @app.route("/html/<path:url>")
 def view_html(url):
@@ -261,7 +244,6 @@ def api_worker_timing_details():
                         'url': record.get('url', ''),
                         'timestamp': record.get('timestamp', 0),
                         'timings': record.get('timings', {}),
-                        'status_code': record.get('status_code'),
                         'error': record.get('error'),
                         'total_time': sum(record.get('timings', {}).values())
                     })

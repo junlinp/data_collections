@@ -10,7 +10,7 @@ A comprehensive web crawling and AI summarization system with a modern web UI. T
 
 ## Features
 
-- **Web Crawling**: Crawl websites with configurable depth and rate limiting
+- **Web Crawling**: Crawl websites with rate limiting
 - **Content Storage**: Persistent MongoDB database storage
 - **AI Summarization**: Generate structured summaries using local LLM models
 - **Modern UI**: Clean, responsive web interface
@@ -97,7 +97,7 @@ Ensure you have Docker and Docker Compose installed on your system.
 **Purpose**: Crawls websites and stores content in MongoDB.
 
 **Features**:
-- Configurable crawl depth and rate limiting
+- Configurable rate limiting
 - Proxy support for network access
 - URL deduplication and history tracking
 - Health monitoring
@@ -198,8 +198,6 @@ The system uses MongoDB with the following collections:
   title: String,
   html_content: String,
   text_content: String,
-  status_code: Number,
-  crawl_depth: Number,
   parent_url: String,
   created_at: Date,
   updated_at: Date
@@ -235,8 +233,6 @@ The system uses MongoDB with the following collections:
 **Indexes**:
 - `web_content.url` (unique)
 - `web_content.created_at`
-- `web_content.crawl_depth`
-- `web_content.status_code`
 - `url_history.url`
 - `url_history.created_at`
 - `url_history.status`
@@ -250,9 +246,8 @@ The system uses MongoDB with the following collections:
 
 1. Open the Web UI at http://localhost:5002
 2. Enter a URL to crawl
-3. Set crawl depth and other options
-4. Click "Start Crawl"
-5. Monitor progress in real-time
+3. Click "Start Crawl"
+4. Monitor progress in real-time
 
 ### Generating Summaries
 
@@ -267,7 +262,7 @@ The system uses MongoDB with the following collections:
 ```bash
 curl -X POST http://localhost:5001/api/crawl \
   -H "Content-Type: application/json" \
-  -d '{"url": "https://example.com", "max_depth": 2}'
+  -d '{"url": "https://example.com"}'
 ```
 
 **Process all URLs for summarization**:
