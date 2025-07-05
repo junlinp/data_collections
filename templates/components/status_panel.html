@@ -1,0 +1,75 @@
+<h2>📊 Queue Status & Worker Management</h2>
+
+<div class="auto-refresh">
+    <input type="checkbox" id="auto-refresh" checked>
+    <label for="auto-refresh">Auto-refresh every 2 seconds</label>
+    <button onclick="refreshQueueStatus()" style="margin-left: 10px;">Refresh Now</button>
+    <span id="status-tab-indicator" style="margin-left: 10px; color: #28a745; font-weight: bold; display: none;">✓ Status Tab Active</span>
+</div>
+
+<!-- Queue Status Section -->
+<div style="margin-bottom: 40px;">
+    <h3>📈 Queue Status</h3>
+    <div id="queue-stats-display" class="stats-grid">
+        <div class="stat-card">
+            <h4>📈 Queue Statistics</h4>
+            <p><strong>Completed URLs:</strong> <span id="completed-urls">-</span></p>
+            <p><strong>Failed URLs:</strong> <span id="failed-urls">-</span></p>
+        </div>
+        <div class="stat-card">
+            <h4>📊 Content Database</h4>
+            <p><strong>Total Records:</strong> <span id="content-records">-</span></p>
+            <p><strong>Total Visits:</strong> <span id="total-visits">-</span></p>
+        </div>
+        <div class="stat-card">
+            <h4>🗃️ Redis Queue Status</h4>
+            <p><strong>Pending in Redis:</strong> <span id="redis-queue-length">{{ redis_queue_length }}</span></p>
+            <p><strong>Visited (24h):</strong> <span id="redis-visited-count">{{ redis_visited_count }}</span></p>
+        </div>
+    </div>
+    <div style="margin: 30px 0;">
+        <h4>📈 Queue Size Trend (Last 24h)</h4>
+        <canvas id="queueTrendChart" height="80"></canvas>
+    </div>
+    <div id="pending-urls-display">
+        <h3>⏳ Pending URLs</h3>
+        <div id="pending-urls-table"></div>
+    </div>
+    
+    <div class="queue-actions">
+        <button onclick="clearQueue()" class="btn-danger">🗑️ Clear Queue</button>
+    </div>
+</div>
+
+<!-- Worker Management Section -->
+<div>
+    <h3>🔧 Worker Management</h3>
+    
+    <div class="worker-info">
+        <strong>Worker System:</strong><br>
+        • <strong>Background Processing:</strong> Workers run continuously in background<br>
+        • <strong>Automatic Queue Processing:</strong> Workers pick up URLs automatically<br>
+        • <strong>Scalable:</strong> Add/remove workers as needed<br>
+        • <strong>Fault Tolerant:</strong> Failed URLs are marked and tracked
+    </div>
+    
+    <div id="worker-stats-display" class="stats-grid">
+        <div class="stat-card">
+            <h4>👥 Worker Status</h4>
+            <p><strong>Total Workers:</strong> <span id="total-workers">-</span></p>
+            <p><strong>Running Workers:</strong> <span id="running-workers">-</span></p>
+            <p><strong>System Status:</strong> <span id="system-status">-</span></p>
+        </div>
+    </div>
+    
+    <div id="worker-details-display" class="worker-grid">
+        <!-- Worker details will be populated here -->
+    </div>
+    
+    <div class="queue-actions">
+        <button onclick="addWorker()" class="btn-success">➕ Add Worker</button>
+        <button onclick="startWorkers()" class="btn-success">▶️ Start All Workers</button>
+        <button onclick="stopWorkers()" class="btn-warning">⏹️ Stop All Workers</button>
+        <button onclick="refreshWorkerStatus()" class="btn-secondary">🔄 Refresh Status</button>
+    </div>
+</div> 

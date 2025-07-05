@@ -5,11 +5,10 @@ Optimized for memory efficiency with on-demand data fetching
 Uses queue-based system with workers
 """
 
-from flask import Flask, request, render_template_string, redirect, url_for, jsonify
+from flask import Flask, request, render_template, redirect, url_for, jsonify
 import requests
 import os
 import logging
-from templates import HTML_TEMPLATE
 import redis
 import time
 import json
@@ -108,7 +107,7 @@ def index():
     r = redis.Redis(host="redis", port=6379, decode_responses=True)
     visited_count = r.scard("crawler:visited")
 
-    return render_template_string(HTML_TEMPLATE, 
+    return render_template('index.html', 
                                 url=url,
                                 message=message, 
                                 success=success,
@@ -375,8 +374,8 @@ def queue_history():
     now = int(time.time())
     data = r.zrangebyscore('queue:history', now - 24*3600, now, withscores=True)
     return jsonify([
-        {'timestamp': int(ts), 'queue_length': int(length)}
-        for ts, length in data
+        {'timestamp': int(timestamp), 'queue_length': int(queue_length)}
+        for queue_length, timestamp in data
     ])
 
 @app.route("/ui/metrics")
@@ -392,50 +391,12 @@ def ui_metrics():
 @app.errorhandler(403)
 def forbidden_error(error):
     """Handle 403 errors"""
-    return render_template_string("""
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <title>403 Forbidden</title>
-            <style>
-                body { font-family: Arial, sans-serif; text-align: center; margin-top: 50px; }
-                .error { color: #d32f2f; font-size: 24px; margin-bottom: 20px; }
-                .message { color: #666; margin-bottom: 30px; }
-                .back-link { color: #2196f3; text-decoration: none; }
-                .back-link:hover { text-decoration: underline; }
-            </style>
-        </head>
-        <body>
-            <div class="error">403 Forbidden</div>
-            <div class="message">You don't have permission to access this resource.</div>
-            <a href="/" class="back-link">← Back to Crawler</a>
-        </body>
-        </html>
-    """), 403
+    return render_template('errors/403.html'), 403
 
 @app.errorhandler(404)
 def not_found_error(error):
     """Handle 404 errors"""
-    return render_template_string("""
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <title>404 Not Found</title>
-            <style>
-                body { font-family: Arial, sans-serif; text-align: center; margin-top: 50px; }
-                .error { color: #d32f2f; font-size: 24px; margin-bottom: 20px; }
-                .message { color: #666; margin-bottom: 30px; }
-                .back-link { color: #2196f3; text-decoration: none; }
-                .back-link:hover { text-decoration: underline; }
-            </style>
-        </head>
-        <body>
-            <div class="error">404 Not Found</div>
-            <div class="message">The requested resource was not found.</div>
-            <a href="/" class="back-link">← Back to Crawler</a>
-        </body>
-        </html>
-    """), 404
+    return render_template('errors/404.html'), 404
 
 @app.route("/api/<path:endpoint>", methods=["GET", "POST"])
 def proxy_api(endpoint):

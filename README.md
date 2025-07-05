@@ -1,12 +1,10 @@
 # Web Crawler with AI Summarization
 
-A comprehensive web crawling and AI summarization system with a modern web UI. The system consists of four main components:
+A comprehensive web crawling and AI summarization system with a unified modern web interface. The system consists of three main components:
 
-1. **Web Crawler Server** - Crawls websites and stores content in a database
-2. **Web UI** - Modern interface for managing crawls and viewing results
-3. **LLM Processor** - Processes crawled content using local LLM models
-4. **Summary Display Server** - Web interface for viewing AI-generated summaries
-5. **Redis **
+1. **Web Crawler Server** - Crawls websites and stores content in MongoDB
+2. **Unified Web Interface** - Single interface for all functionality (crawling, AI processing, summaries)
+3. **Storage Services** - MongoDB for data persistence and Redis for queue management
 
 ## Features
 
@@ -65,10 +63,8 @@ Ensure you have Docker and Docker Compose installed on your system.
    ```
 
 3. **Access the services**:
-   - Web Crawler UI: http://localhost:5002
-   - Summary Display: http://localhost:5004
+   - **Unified Web Interface: http://localhost:5000** (All functionality in one place)
    - Crawler API: http://localhost:5001
-   - LLM Processor API: http://localhost:5003
 
 ## Service Architecture
 

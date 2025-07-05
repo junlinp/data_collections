@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}AI Content Summaries{% endblock %}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/summary.css') }}">
+    {% block extra_css %}{% endblock %}
+</head>
+<body>
+    <div class="container">
+        {% block header %}
+        <div class="header">
+            <h1>AI Content Summaries</h1>
+            <p>Intelligent summaries of crawled web content</p>
+        </div>
+        {% endblock %}
+        
+        {% block content %}{% endblock %}
+    </div>
+    
+    {% block scripts %}
+    <script src="{{ url_for('static', filename='js/summary.js') }}"></script>
+    {% endblock %}
+    
+    {% block extra_js %}{% endblock %}
+</body>
+</html> 

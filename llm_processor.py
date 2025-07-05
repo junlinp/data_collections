@@ -19,6 +19,31 @@ load_dotenv()
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
+# HTML Content Processing Configuration
+HTML_PROCESSING_CONFIG = {
+    'max_html_chars': 8000,  # Maximum HTML characters to send to LLM
+    'max_html_size': 500000,  # Maximum HTML size for processing (500KB)
+    'min_content_length': 100,  # Minimum content length to consider valid
+    'unwanted_tags': [
+        'script', 'style', 'noscript', 'iframe', 'object', 'embed',
+        'applet', 'canvas', 'svg', 'meta', 'link', 'head', 'title',
+        'nav', 'header', 'footer', 'aside', 'form'
+    ],
+    'unwanted_class_patterns': [
+        'ad', 'banner', 'popup', 'modal', 'overlay', 'sidebar',
+        'widget', 'social', 'share', 'comment', 'navigation', 'menu',
+        'breadcrumb', 'pagination', 'tags', 'categories', 'author-info',
+        'post-meta', 'advertisement', 'sponsor', 'affiliate', 'related',
+        'recommended'
+    ],
+    'main_content_selectors': [
+        'main', 'article', '[role="main"]', '[role="article"]',
+        '.main-content', '.article-content', '.post-content',
+        '.content-area', '.entry-content', '.article-body',
+        '#main', '#content', '#article', '#post'
+    ]
+}
+
 app = Flask(__name__)
 CORS(app)
 
@@ -116,35 +141,42 @@ class LLMProcessor:
     def _extract_with_llm(self, html_content):
         """Use LLM to extract structured information from HTML"""
         try:
+            # Pre-process HTML to remove obvious unwanted elements
+            html_content = self._preprocess_html(html_content)
+            
             # Truncate HTML if too long for LLM
-            max_html_chars = 8000  # Conservative limit for HTML processing
+            max_html_chars = HTML_PROCESSING_CONFIG['max_html_chars']
             if len(html_content) > max_html_chars:
                 html_content = html_content[:max_html_chars] + "..."
             
             prompt = f"""
-            Please extract structured information from the following HTML content.
+            Please extract structured information from the following HTML content. 
+            IMPORTANT: Focus ONLY on the main article content and ignore all navigation, advertisements, sidebars, comments, social media widgets, and other non-content elements.
             
             HTML Content:
             {html_content}
             
             Please extract and return the following information in JSON format:
-            1. article_title: The main title/headline of the article
+            1. article_title: The main title/headline of the article (not site title or navigation)
             2. publication_date: The publication date (if found)
-            3. main_content: The main article content (clean text without HTML tags)
+            3. main_content: ONLY the main article content (clean text without HTML tags, JavaScript, CSS, or any non-content elements)
             4. language: The language of the content (english/chinese/unknown)
             
             Focus on:
-            - Remove all HTML tags, navigation, ads, and non-content elements
-            - Extract only the main article content
-            - Preserve the logical flow and structure of the content
-            - Identify the most accurate title for the article
+            - Remove ALL HTML tags, JavaScript, CSS, and styling
+            - Ignore navigation menus, headers, footers, sidebars
+            - Ignore advertisements, social media widgets, comments
+            - Ignore "related articles", "recommended reading", author bios
+            - Extract ONLY the core article text that contains the main information
+            - Preserve the logical flow and structure of the main content
+            - Identify the most accurate title for the article content
             - Find publication dates in various formats
             
             Return as JSON:
             {{
                 "article_title": "extracted title",
                 "publication_date": "extracted date or null",
-                "main_content": "clean main content text",
+                "main_content": "clean main content text only",
                 "language": "english/chinese/unknown"
             }}
             """
@@ -208,13 +240,70 @@ class LLMProcessor:
             for element in soup(["script", "style", "nav", "header", "footer", "aside", "form"]):
                 element.decompose()
             
-            # Get text content
-            text = soup.get_text(separator=' ', strip=True)
+            # Remove additional unwanted elements that don't contain main content
+            unwanted_elements = [
+                "script", "style", "nav", "header", "footer", "aside", "form",
+                "iframe", "object", "embed", "applet", "canvas", "svg",
+                "noscript", "meta", "link", "title", "head",
+                # Common ad and tracking elements
+                "[class*='ad']", "[class*='banner']", "[class*='popup']",
+                "[class*='modal']", "[class*='overlay']", "[class*='sidebar']",
+                "[class*='widget']", "[class*='social']", "[class*='share']",
+                "[class*='comment']", "[class*='related']", "[class*='recommended']",
+                "[id*='ad']", "[id*='banner']", "[id*='popup']",
+                "[id*='modal']", "[id*='overlay']", "[id*='sidebar']",
+                # Navigation and menu elements
+                "[role='navigation']", "[role='banner']", "[role='complementary']",
+                "[role='contentinfo']", "[role='form']", "[role='search']",
+                # Common class names for non-content
+                ".navigation", ".menu", ".navbar", ".breadcrumb", ".pagination",
+                ".tags", ".categories", ".author-info", ".post-meta",
+                ".advertisement", ".sponsor", ".affiliate"
+            ]
             
-            # Clean up whitespace
+            # Remove all unwanted elements
+            for selector in unwanted_elements:
+                for element in soup.select(selector):
+                    element.decompose()
+            
+            # Try to find main content areas first
+            main_content = None
+            
+            # Look for semantic HTML5 main content
+            main_selectors = HTML_PROCESSING_CONFIG['main_content_selectors']
+            
+            for selector in main_selectors:
+                main_element = soup.select_one(selector)
+                if main_element and len(main_element.get_text(strip=True)) > 200:
+                    main_content = main_element
+                    break
+            
+            # If no main content found, use the body or the whole document
+            if not main_content:
+                main_content = soup.find('body') or soup
+            
+            # Remove any remaining unwanted elements from main content
+            try:
+                if main_content and hasattr(main_content, 'find_all'):
+                    for element in main_content.find_all(['script', 'style', 'noscript']):
+                        element.decompose()
+            except Exception as e:
+                logger.debug(f"Error removing unwanted elements from main content: {e}")
+            
+            # Get text content from main content area
+            text = main_content.get_text(separator=' ', strip=True)
+            
+            # Clean up whitespace and normalize text
             lines = (line.strip() for line in text.splitlines())
             chunks = (phrase.strip() for line in lines for phrase in line.split("  "))
             text = ' '.join(chunk for chunk in chunks if chunk)
+            
+            # Remove excessive whitespace
+            text = re.sub(r'\s+', ' ', text)
+            
+            # Filter out very short content (likely not main content)
+            if len(text) < HTML_PROCESSING_CONFIG['min_content_length']:
+                return "", "unknown", None, None
             
             # Detect language
             language = detect_language(text)
@@ -224,6 +313,44 @@ class LLMProcessor:
         except Exception as e:
             logger.error(f"Error in fallback text extraction: {e}")
             return "", "unknown", None, None
+    
+    def _preprocess_html(self, html_content):
+        """Pre-process HTML to remove obvious unwanted elements before LLM processing"""
+        try:
+            # Check HTML size limit
+            if len(html_content) > HTML_PROCESSING_CONFIG['max_html_size']:
+                logger.warning(f"HTML content too large: {len(html_content)} chars, truncating to {HTML_PROCESSING_CONFIG['max_html_size']}")
+                html_content = html_content[:HTML_PROCESSING_CONFIG['max_html_size']] + "..."
+            
+            soup = BeautifulSoup(html_content, 'html.parser')
+            
+            # Remove elements that should never be processed by LLM
+            unwanted_tags = HTML_PROCESSING_CONFIG['unwanted_tags']
+            
+            for tag in unwanted_tags:
+                for element in soup.find_all(tag):
+                    element.decompose()
+            
+            # Remove common non-content elements by class and id patterns
+            unwanted_patterns = []
+            for pattern in HTML_PROCESSING_CONFIG['unwanted_class_patterns']:
+                unwanted_patterns.extend([
+                    f"[class*='{pattern}']",
+                    f"[id*='{pattern}']",
+                    f".{pattern}"
+                ])
+            
+            for pattern in unwanted_patterns:
+                for element in soup.select(pattern):
+                    element.decompose()
+            
+            # Return cleaned HTML
+            return str(soup)
+            
+        except Exception as e:
+            logger.error(f"Error in HTML preprocessing: {e}")
+            # Return original HTML if preprocessing fails
+            return html_content
     
     # Removed BeautifulSoup-based extraction methods - now using LLM for extraction
     

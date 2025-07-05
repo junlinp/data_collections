@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Queue-Based Web Crawler{% endblock %}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
+    {% block extra_css %}{% endblock %}
+</head>
+<body>
+    <div class="container">
+        {% block header %}
+        <div class="header">
+            <h1>🕷️ Queue-Based Web Crawler</h1>
+            <p>Add URLs to queue • Workers process automatically • 24-hour visit tracking</p>
+        </div>
+        {% endblock %}
+        
+        {% block messages %}
+        {% if message %}
+            <div class="results">
+                <div class="{{ 'success' if success else 'error' }}">{{ message }}</div>
+            </div>
+        {% endif %}
+        {% endblock %}
+        
+        {% block content %}{% endblock %}
+    </div>
+    
+    <!-- External dependencies -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <!-- Main application JavaScript -->
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+    
+    {% block extra_js %}{% endblock %}
+</body>
+</html> 

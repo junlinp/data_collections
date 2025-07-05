@@ -1,0 +1,199 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Unified Web Crawler & AI Summarization</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/unified.css') }}">
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🚀 Unified Web Crawler & AI Summarization</h1>
+            <p>Comprehensive web crawling, processing, and summarization platform</p>
+        </div>
+
+        <!-- Navigation Tabs -->
+        <div class="nav-tabs">
+            <button class="tab-button active" onclick="showTab('crawler')">🕷️ Crawler</button>
+            <button class="tab-button" onclick="showTab('processing')">🤖 AI Processing</button>
+            <button class="tab-button" onclick="showTab('summaries')">📄 Summaries</button>
+            <button class="tab-button" onclick="showTab('data')">📊 Data</button>
+            <button class="tab-button" onclick="showTab('stats')">📈 Statistics</button>
+        </div>
+
+        <!-- Messages -->
+        <div id="message-container" class="message-container"></div>
+
+        <!-- Crawler Tab -->
+        <div id="crawler-tab" class="tab-content active">
+            <h2>🕷️ Web Crawler</h2>
+            
+            <!-- URL Input -->
+            <div class="section">
+                <h3>Add URL to Queue</h3>
+                <div class="form-group">
+                    <input type="text" id="url-input" placeholder="https://example.com" />
+                    <select id="priority-select">
+                        <option value="0">Normal Priority</option>
+                        <option value="1">High Priority</option>
+                        <option value="-1">Low Priority</option>
+                    </select>
+                    <button onclick="addUrlToQueue()">Add URL</button>
+                </div>
+            </div>
+
+            <!-- Queue Statistics -->
+            <div class="section">
+                <h3>Queue Status</h3>
+                <div id="queue-stats" class="stats-grid">
+                    <div class="stat-card">
+                        <span class="stat-label">Pending URLs</span>
+                        <span class="stat-value" id="pending-count">-</span>
+                    </div>
+                    <div class="stat-card">
+                        <span class="stat-label">Completed URLs</span>
+                        <span class="stat-value" id="completed-count">-</span>
+                    </div>
+                    <div class="stat-card">
+                        <span class="stat-label">Failed URLs</span>
+                        <span class="stat-value" id="failed-count">-</span>
+                    </div>
+                    <div class="stat-card">
+                        <span class="stat-label">Running Workers</span>
+                        <span class="stat-value" id="worker-count">-</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Worker Management -->
+            <div class="section">
+                <h3>Worker Management</h3>
+                <div class="button-group">
+                    <button onclick="startWorkers()">Start Workers</button>
+                    <button onclick="stopWorkers()">Stop Workers</button>
+                    <button onclick="clearQueue()">Clear Queue</button>
+                </div>
+            </div>
+
+            <!-- Pending URLs -->
+            <div class="section">
+                <h3>Pending URLs</h3>
+                <div id="pending-urls" class="url-list"></div>
+            </div>
+        </div>
+
+        <!-- Processing Tab -->
+        <div id="processing-tab" class="tab-content">
+            <h2>🤖 AI Processing</h2>
+            
+            <!-- Processing Status -->
+            <div class="section">
+                <h3>Processing Status</h3>
+                <div id="processing-stats" class="stats-grid">
+                    <div class="stat-card">
+                        <span class="stat-label">Unprocessed</span>
+                        <span class="stat-value" id="unprocessed-count">-</span>
+                    </div>
+                    <div class="stat-card">
+                        <span class="stat-label">Processed</span>
+                        <span class="stat-value" id="processed-count">-</span>
+                    </div>
+                    <div class="stat-card">
+                        <span class="stat-label">LLM Status</span>
+                        <span class="stat-value" id="llm-status">-</span>
+                    </div>
+                    <div class="stat-card">
+                        <span class="stat-label">Processing</span>
+                        <span class="stat-value" id="processing-status">-</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Processing Actions -->
+            <div class="section">
+                <h3>Processing Actions</h3>
+                <div class="button-group">
+                    <button onclick="processAllContent()">Process All Content</button>
+                    <button onclick="refreshProcessingStats()">Refresh Status</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Summaries Tab -->
+        <div id="summaries-tab" class="tab-content">
+            <h2>📄 Summaries</h2>
+            
+            <!-- Search -->
+            <div class="section">
+                <div class="form-group">
+                    <input type="text" id="search-input" placeholder="Search summaries..." />
+                    <button onclick="searchSummaries()">Search</button>
+                    <button onclick="loadSummaries()">Load All</button>
+                </div>
+            </div>
+
+            <!-- Summaries List -->
+            <div id="summaries-container" class="summaries-grid"></div>
+
+            <!-- Pagination -->
+            <div class="pagination" id="pagination">
+                <button onclick="changePage(-1)" id="prev-btn">Previous</button>
+                <span id="page-info">Page 1 of 1</span>
+                <button onclick="changePage(1)" id="next-btn">Next</button>
+            </div>
+        </div>
+
+        <!-- Data Tab -->
+        <div id="data-tab" class="tab-content">
+            <h2>📊 Crawled Data</h2>
+            
+            <!-- Data List -->
+            <div id="data-container" class="data-grid"></div>
+
+            <!-- Data Pagination -->
+            <div class="pagination" id="data-pagination">
+                <button onclick="changeDataPage(-1)" id="data-prev-btn">Previous</button>
+                <span id="data-page-info">Page 1 of 1</span>
+                <button onclick="changeDataPage(1)" id="data-next-btn">Next</button>
+            </div>
+        </div>
+
+        <!-- Statistics Tab -->
+        <div id="stats-tab" class="tab-content">
+            <h2>📈 System Statistics</h2>
+            
+            <!-- Overall Stats -->
+            <div class="section">
+                <h3>Overall Statistics</h3>
+                <div id="overall-stats" class="stats-grid">
+                    <div class="stat-card">
+                        <span class="stat-label">Total URLs</span>
+                        <span class="stat-value" id="total-urls">-</span>
+                    </div>
+                    <div class="stat-card">
+                        <span class="stat-label">Total Summaries</span>
+                        <span class="stat-value" id="total-summaries">-</span>
+                    </div>
+                    <div class="stat-card">
+                        <span class="stat-label">Redis Queue</span>
+                        <span class="stat-value" id="redis-queue">-</span>
+                    </div>
+                    <div class="stat-card">
+                        <span class="stat-label">System Health</span>
+                        <span class="stat-value" id="system-health">-</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Service Health -->
+            <div class="section">
+                <h3>Service Health</h3>
+                <div id="service-health" class="health-grid"></div>
+            </div>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/unified.js') }}"></script>
+</body>
+</html> 

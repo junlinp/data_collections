@@ -1,0 +1,41 @@
+{% extends "summary_base.html" %}
+
+{% block content %}
+<div class="controls">
+    <div class="stats">
+        <div class="stat-card" title="Total summaries">
+            <span class="stat-number" id="total-summaries">-</span>
+            <span class="stat-label">Summaries</span>
+            <div class="stat-tooltip">Total number of summaries</div>
+        </div>
+        <div class="stat-card" title="Processing status">
+            <span class="stat-number" id="processing-status">-</span>
+            <span class="stat-label">Status</span>
+            <div class="stat-tooltip">Current processing status</div>
+        </div>
+        <div class="stat-card" title="LLM Model">
+            <span class="stat-number" id="llm-model">-</span>
+            <span class="stat-label">Model</span>
+            <div class="stat-tooltip">Current LLM model being used</div>
+        </div>
+    </div>
+    
+    <div class="search-box">
+        <input type="text" id="search-input" class="search-input" placeholder="Search summaries...">
+        <button class="btn" onclick="searchSummaries()">Search</button>
+    </div>
+    
+    <button class="btn" onclick="loadSummaries()">Refresh</button>
+    <button class="btn btn-danger" onclick="processAllContent()">Process All</button>
+</div>
+
+<div id="summaries-container">
+    <div class="loading">Loading summaries...</div>
+</div>
+
+<div class="pagination" id="pagination" style="display: none;">
+    <button onclick="changePage(-1)" id="prev-btn">Previous</button>
+    <span id="page-info">Page 1</span>
+    <button onclick="changePage(1)" id="next-btn">Next</button>
+</div>
+{% endblock %} 

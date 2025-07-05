@@ -7,51 +7,153 @@ Uses queue-based system with workers
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from queue_manager import queue_manager
-from crawler_worker import worker_manager
+from crawler_worker_optimized import memory_optimized_worker_manager as worker_manager
 import threading
 import time
 import os
 import logging
+import sys
+import traceback
+import psutil
+import signal
+from datetime import datetime
 from redis_queue_manager import RedisQueueManager
 from mongo_utils import get_mongo_manager
 
-# Configure logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+# Configure logging with more detailed format
+logging.basicConfig(
+    level=logging.INFO, 
+    format='%(asctime)s - %(name)s - %(levelname)s - [PID:%(process)d] - %(message)s',
+    handlers=[
+        logging.StreamHandler(sys.stdout),
+        logging.FileHandler('/app/data/crawler_server.log', mode='a')
+    ]
+)
 logger = logging.getLogger(__name__)
+
+# Add startup logging
+logger.info("="*80)
+logger.info("CRAWLER SERVER STARTING UP")
+logger.info(f"Python version: {sys.version}")
+logger.info(f"Process ID: {os.getpid()}")
+logger.info(f"Current working directory: {os.getcwd()}")
+logger.info(f"Environment variables: {dict(os.environ)}")
+logger.info("="*80)
+
+def log_system_resources():
+    """Log current system resource usage"""
+    try:
+        process = psutil.Process()
+        memory_info = process.memory_info()
+        cpu_percent = process.cpu_percent()
+        
+        logger.info(f"SYSTEM RESOURCES - Memory: {memory_info.rss / 1024 / 1024:.2f}MB, "
+                   f"CPU: {cpu_percent}%, "
+                   f"Threads: {process.num_threads()}, "
+                   f"Open files: {process.num_fds()}")
+        
+        # Check memory usage against limits
+        memory_mb = memory_info.rss / 1024 / 1024
+        if memory_mb > 3000:  # 3GB warning threshold
+            logger.warning(f"HIGH MEMORY USAGE: {memory_mb:.2f}MB (limit: 4GB)")
+        
+    except Exception as e:
+        logger.error(f"Error logging system resources: {e}")
+
+def setup_signal_handlers():
+    """Setup signal handlers for graceful shutdown"""
+    def signal_handler(signum, frame):
+        logger.info(f"Received signal {signum}, initiating graceful shutdown...")
+        log_system_resources()
+        try:
+            worker_manager.stop_workers()
+            logger.info("Workers stopped successfully")
+        except Exception as e:
+            logger.error(f"Error stopping workers during shutdown: {e}")
+        sys.exit(0)
+    
+    signal.signal(signal.SIGTERM, signal_handler)
+    signal.signal(signal.SIGINT, signal_handler)
+
+setup_signal_handlers()
 
 app = Flask(__name__)
 CORS(app)  # Enable CORS for cross-origin requests
 
-# Initialize queue manager (uses Redis now)
-# queue_manager.db_path is no longer needed as it uses Redis
+# Log Flask app creation
+logger.info("Flask app created successfully")
 
-# Initialize worker manager (uses MongoDB now)
-# worker_manager.content_db_path is no longer needed as it uses MongoDB
+# Test database connections on startup
+def test_database_connections():
+    """Test database connections on startup"""
+    logger.info("Testing database connections...")
+    
+    # Test Redis connection
+    try:
+        queue = RedisQueueManager(host='redis', port=6379)
+        queue.r.ping()
+        logger.info("✅ Redis connection successful")
+    except Exception as e:
+        logger.error(f"❌ Redis connection failed: {e}")
+        logger.error(traceback.format_exc())
+        raise
+    
+    # Test MongoDB connection
+    try:
+        mongo_manager = get_mongo_manager()
+        stats = mongo_manager.get_database_stats()
+        logger.info(f"✅ MongoDB connection successful - stats: {stats}")
+    except Exception as e:
+        logger.error(f"❌ MongoDB connection failed: {e}")
+        logger.error(traceback.format_exc())
+        raise
+
+# Test connections before starting workers
+try:
+    test_database_connections()
+    logger.info("All database connections verified successfully")
+except Exception as e:
+    logger.critical(f"Database connection test failed: {e}")
+    sys.exit(1)
 
 # Start workers automatically in a background thread to avoid blocking Flask startup
 def start_workers_async():
     try:
+        logger.info("Starting workers asynchronously...")
+        log_system_resources()
         worker_manager.start_workers()
+        logger.info("✅ Workers started successfully")
     except Exception as e:
-        logger.error(f"Error starting workers: {e}")
+        logger.error(f"❌ Error starting workers: {e}")
+        logger.error(traceback.format_exc())
 
 worker_thread = threading.Thread(target=start_workers_async, daemon=True)
 worker_thread.start()
+logger.info("Worker startup thread created")
 
-# Optionally: Start a background thread to poll Redis and process URLs
-# redis_worker_status = {'running': True}
-# def redis_background_worker():
-#     queue = RedisQueueManager(host='redis', port=6379)
-#     while True:
-#         url = queue.get_next_url()
-#         if url:
-#             print(f"[Redis Background Worker] Processing URL: {url}")
-#             # Optionally, add your processing logic here
-#         else:
-#             time.sleep(1)
-#         # Update status
-#         redis_worker_status['running'] = True
-# threading.Thread(target=redis_background_worker, daemon=True).start()
+# Monitor worker thread health
+def monitor_worker_thread():
+    """Monitor worker thread health"""
+    if not worker_thread.is_alive():
+        logger.error("❌ Worker thread is dead!")
+        log_system_resources()
+    else:
+        logger.debug("✅ Worker thread is alive")
+
+# Log system resources periodically
+def log_resources_periodically():
+    """Log system resources every 5 minutes"""
+    while True:
+        try:
+            time.sleep(300)  # 5 minutes
+            log_system_resources()
+            monitor_worker_thread()
+        except Exception as e:
+            logger.error(f"Error in resource monitoring thread: {e}")
+
+resource_monitor_thread = threading.Thread(target=log_resources_periodically, daemon=True)
+resource_monitor_thread.start()
+logger.info("Resource monitoring thread started")
 
 @app.route("/api/ping", methods=["GET"])
 def api_ping():
@@ -74,47 +176,82 @@ def api_simple_stats():
 @app.route("/api/health", methods=["GET"])
 def health_check():
     """Health check endpoint"""
-    logger.info("/api/health called: start")
-    queue = RedisQueueManager(host='redis', port=6379)
-    logger.info("/api/health: got RedisQueueManager")
+    start_time = time.time()
+    logger.info("🔍 Health check requested")
     
-    # Get metrics from Redis (updated by workers)
-    metrics = queue.r.hgetall('crawler:metrics')
-    
-    # Use fast approach for queue stats
     try:
-        counter = queue.r.get(queue.counter_key)
-        if counter is not None:
-            queued_urls = int(counter)
-        else:
-            queued_urls = 1500000  # Conservative estimate
-    except:
-        queued_urls = 1500000  # Fallback estimate
+        log_system_resources()
         
-    # Get actual metrics from Redis
-    completed_urls = int(metrics.get('completed_urls', 0))
-    failed_urls = int(metrics.get('failed_urls', 0))
-    total_urls = int(metrics.get('total_urls', queued_urls))
+        # Test Redis connection
+        queue = RedisQueueManager(host='redis', port=6379)
+        logger.info("Health check: Testing Redis connection...")
+        queue.r.ping()
+        logger.info("✅ Redis connection healthy")
         
-    stats = {
-        'total_urls': total_urls,
-        'queued_urls': queued_urls,
-        'pending_urls_count': queued_urls,  # Same as queued_urls for consistency
-        'processing_urls': 0,  # Workers don't track this currently
-        'completed_urls': completed_urls,
-        'failed_urls': failed_urls
-    }
-    
-    logger.info(f"/api/health: got queue state: {stats}")
-    response = jsonify({
-        'status': 'healthy',
-        'service': 'crawler-server',
-        'timestamp': time.time(),
-        'workers_running': worker_manager.running,
-        'queue_stats': stats
-    })
-    logger.info("/api/health: returning response")
-    return response
+        # Test MongoDB connection
+        logger.info("Health check: Testing MongoDB connection...")
+        mongo_manager = get_mongo_manager()
+        stats = mongo_manager.get_database_stats()
+        logger.info(f"✅ MongoDB connection healthy - stats: {stats}")
+        
+        # Get metrics from Redis (updated by workers)
+        metrics = queue.r.hgetall('crawler:metrics')
+        logger.info(f"Health check: Retrieved metrics from Redis: {metrics}")
+        
+        # Use fast approach for queue stats
+        try:
+            counter = queue.r.get(queue.counter_key)
+            if counter is not None:
+                queued_urls = int(counter)
+            else:
+                queued_urls = 1500000  # Conservative estimate
+        except Exception as e:
+            logger.warning(f"Error getting queue counter: {e}")
+            queued_urls = 1500000  # Fallback estimate
+            
+        # Get actual metrics from Redis
+        completed_urls = int(metrics.get('completed_urls', 0))
+        failed_urls = int(metrics.get('failed_urls', 0))
+        total_urls = int(metrics.get('total_urls', queued_urls))
+        
+        stats = {
+            'total_urls': total_urls,
+            'queued_urls': queued_urls,
+            'pending_urls_count': queued_urls,
+            'processing_urls': 0,
+            'completed_urls': completed_urls,
+            'failed_urls': failed_urls
+        }
+        
+        logger.info(f"Health check: Queue stats compiled: {stats}")
+        
+        response = jsonify({
+            'status': 'healthy',
+            'service': 'crawler-server',
+            'timestamp': time.time(),
+            'workers_running': worker_manager.running,
+            'queue_stats': stats,
+            'uptime_seconds': time.time() - start_time,
+            'memory_usage_mb': psutil.Process().memory_info().rss / 1024 / 1024
+        })
+        
+        elapsed = time.time() - start_time
+        logger.info(f"✅ Health check completed successfully in {elapsed:.2f}s")
+        return response
+        
+    except Exception as e:
+        elapsed = time.time() - start_time
+        logger.error(f"❌ Health check failed after {elapsed:.2f}s: {e}")
+        logger.error(traceback.format_exc())
+        log_system_resources()
+        
+        return jsonify({
+            'status': 'unhealthy',
+            'service': 'crawler-server',
+            'timestamp': time.time(),
+            'error': str(e),
+            'elapsed_seconds': elapsed
+        }), 500
 
 @app.route("/api/add-url", methods=["POST"])
 def api_add_url():
@@ -474,5 +611,27 @@ def api_database_stats():
             'error': f'Error getting database stats: {str(e)}'
         }), 500
 
+# Add error handler for unhandled exceptions
+@app.errorhandler(Exception)
+def handle_exception(e):
+    """Handle unhandled exceptions"""
+    logger.error(f"❌ Unhandled exception in Flask app: {e}")
+    logger.error(traceback.format_exc())
+    log_system_resources()
+    
+    return jsonify({
+        'success': False,
+        'error': 'Internal server error',
+        'timestamp': time.time()
+    }), 500
+
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5001, debug=False) 
+    logger.info("Starting Flask application...")
+    logger.info(f"Binding to host: 0.0.0.0, port: 5001")
+    
+    try:
+        app.run(host="0.0.0.0", port=5001, debug=False, threaded=True)
+    except Exception as e:
+        logger.critical(f"❌ Flask app failed to start: {e}")
+        logger.critical(traceback.format_exc())
+        sys.exit(1) 

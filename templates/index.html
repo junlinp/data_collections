@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="nav-tabs">
+    <a href="#queue" class="active" onclick="showTab('queue', event)">Add to Queue</a>
+    <a href="#status" onclick="showTab('status', event)">Queue & Workers</a>
+</div>
+
+<div id="queue-tab" style="display: block;">
+    {% include 'components/queue_form.html' %}
+</div>
+
+<div id="status-tab" style="display: none;">
+    {% include 'components/status_panel.html' %}
+</div>
+{% endblock %} 
